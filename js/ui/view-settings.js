@@ -49,19 +49,26 @@
   FCS.settingsUI.loadSample = function () {
     const U = FCS.util;
     const d = data();
+    const samples = FCS.sampleData.build();
+    const exists = d.classes.some(function (c) {
+      return c.name === samples[0].name || c.name === samples[1].name;
+    });
+    if (exists) {
+      U.toast("示例班级已存在（应用化学一班、二班），无需重复加载", "warn");
+      return;
+    }
+    const add = function () {
+      samples.forEach(function (c) { d.classes.push(c); });
+      FCS.storage.save(d);
+      U.toast("示例班级已添加：应用化学一班、二班（每班40人，各含初测/复测）", "success");
+      FCS.app.refresh();
+    };
     if (d.classes.length) {
-      U.confirm("加载示例数据将把示例班级添加到现有数据中（不会覆盖现有数据），确定继续吗？").then(function (ok) {
-        if (!ok) return;
-        d.classes.push(FCS.sampleData.build());
-        FCS.storage.save(d);
-        U.toast("示例班级已添加", "success");
-        FCS.app.refresh();
+      U.confirm("加载示例数据将添加应用化学一班、二班（每班40人，含初测和复测两次数据），不会覆盖现有数据。确定继续吗？").then(function (ok) {
+        if (ok) add();
       });
     } else {
-      d.classes.push(FCS.sampleData.build());
-      FCS.storage.save(d);
-      U.toast("示例班级已添加", "success");
-      FCS.app.refresh();
+      add();
     }
   };
   FCS.settingsUI.help = function () {
@@ -105,7 +112,7 @@
         '<div class="card settings-block mt16">' +
         '<div class="card-title">其他</div>' +
         '<div class="setting-row"><div><div class="sr-title">加载示例数据</div>' +
-        '<div class="sr-desc">添加一个示例班级（含初测和复测两次数据），便于体验各项功能</div></div>' +
+        '<div class="sr-desc">生成应用化学一班、二班示例班级（每班40人，含初测和复测两次数据），便于体验各项功能</div></div>' +
         '<button class="btn" onclick="FCS.settingsUI.loadSample()">加载示例</button></div>' +
         '<div class="setting-row"><div><div class="sr-title">清空全部数据</div>' +
         '<div class="sr-desc text-danger">删除所有班级、批次和成绩，不可恢复</div></div>' +
@@ -114,7 +121,7 @@
         '<div class="sr-desc">查看软件使用步骤说明</div></div>' +
         '<button class="btn" onclick="FCS.settingsUI.help()">查看帮助</button></div>' +
         '<div class="setting-row"><div><div class="sr-title">关于</div>' +
-        '<div class="sr-desc">育健体测数据分析软件 v4.19（网页版）</div></div></div>' +
+        '<div class="sr-desc">育健体测数据分析软件 v4.20（网页版）</div></div></div>' +
         "</div>";
       el.innerHTML = html;
       FCS.aiAPI.fillForm();

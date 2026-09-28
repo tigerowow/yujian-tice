@@ -71,9 +71,8 @@
           };
         }
       }
-      /* 个人建议 */
-      const weakKeys = rep.weakItems.must.map(function (w) { return w.key; })
-        .concat(rep.weakItems.relative.map(function (w) { return w.key; }));
+      /* 个人建议（suggestForWeakItems 需要 {key} 对象，传字符串会静默返回空） */
+      const weakKeys = rep.weakItems.must.concat(rep.weakItems.relative).map(function (w) { return { key: w.key }; });
       const suggestions = FCS.training.suggestForWeakItems(weakKeys, rep.gender);
 
       let html = '<div class="card mb16"><div class="student-hero">' +
