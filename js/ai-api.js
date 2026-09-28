@@ -159,7 +159,7 @@
   }
 
   A.pollRetrieve = function (chatId, convId, token, n) {
-    if (n >= 30) return Promise.reject({ friendly: "AI响应超时，请稍后再试" });
+    if (n >= 80) return Promise.reject({ friendly: "AI响应超时，请稍后再试" }); /* 0.5秒×80次=40秒上限（联网搜索+长回答需要时间） */
     return new Promise(function (resolve, reject) {
       setTimeout(function () {
         apiFetch(API_BASE + "/v3/chat/retrieve?conversation_id=" + encodeURIComponent(convId) + "&chat_id=" + encodeURIComponent(chatId), {
