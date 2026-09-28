@@ -121,7 +121,7 @@
         '<div class="sr-desc">查看软件使用步骤说明</div></div>' +
         '<button class="btn" onclick="FCS.settingsUI.help()">查看帮助</button></div>' +
         '<div class="setting-row"><div><div class="sr-title">关于</div>' +
-        '<div class="sr-desc">育健体测数据分析软件 v4.22（网页版）</div></div></div>' +
+        '<div class="sr-desc">育健体测数据分析软件 v4.23（网页版）</div></div></div>' +
         "</div>";
       el.innerHTML = html;
       FCS.aiAPI.fillForm();
