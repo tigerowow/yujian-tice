@@ -1,0 +1,8 @@
+本文件夹存放软件运行所需的第三方库（已下载到本地，离线可用）。
+
+- xlsx.full.min.js    SheetJS 0.18.5   用于读取Excel文件   npm包名: xlsx
+- echarts.min.js      ECharts 6.1.0    用于绘制图表        npm包名: echarts
+- html2canvas.min.js  html2canvas 1.4.1 报告截图渲染        npm包名: html2canvas
+- jspdf.umd.min.js    jsPDF 4.2.1      用于生成PDF报告     npm包名: jspdf
+
+请勿删除或改名这些文件，否则软件将无法运行。

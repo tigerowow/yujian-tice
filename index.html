@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>育健体测数据分析软件</title>
+  <link rel="stylesheet" href="css/base.css?v=58">
+  <link rel="stylesheet" href="css/layout.css?v=58">
+  <link rel="stylesheet" href="css/views.css?v=58">
+</head>
+<body>
+  <div id="app">
+    <!-- 侧边栏 -->
+    <aside id="sidebar">
+      <div class="side-logo">
+        <img src="logo.jpeg" class="side-logo-img" alt="育健logo">
+        <div class="side-logo-text">
+          <div class="logo-title">育健体测分析</div>
+          <div class="logo-sub">大学生体质测试数据管理</div>
+        </div>
+      </div>
+      <nav class="side-nav">
+        <a href="#/home"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5L21 11h-2.5v9h-5.5v-5.5h-2V20H5.5v-9H3z"/></svg></span>首页</a>
+        <a href="#/classes"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></span>班级管理</a>
+        <a href="#/entry"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.5 3.5h11l3 3V20.5h-14zM16 3.5v4h4M9 12h7M9 15.5h7"/></svg></span>数据录入</a>
+        <a href="#/analysis"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 20v-6.5h4.5V20zM9.75 20V4h4.5v16zM15.5 20v-9.5H20V20z"/></svg></span>班级分析</a>
+        <a href="#/compare"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5.5-5.5 3.5 3.5L19.5 7"/><path d="M15.5 7h4v4"/></svg></span>对比分析</a>
+        <a href="#/training"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="9" r="5.2"/><path d="M8.4 13.6L6.8 21l5.2-2.8L17.2 21l-1.6-7.4z"/></svg></span>训练计划</a>
+        <a href="#/ai"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5zM8.3 10.5a1.3 1.3 0 1 0 0-2.6a1.3 1.3 0 1 0 0 2.6zM13.7 10.5a1.3 1.3 0 1 0 0-2.6a1.3 1.3 0 1 0 0 2.6zM19.1 10.5a1.3 1.3 0 1 0 0-2.6a1.3 1.3 0 1 0 0 2.6z"/></svg></span>AI教练</a>
+        <a href="#/settings"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M4 7h6.5"/><circle cx="13.5" cy="7" r="2.4"/><path d="M16.5 7H20"/><path d="M4 17h1.5"/><circle cx="8.5" cy="17" r="2.4"/><path d="M11.5 17H20"/></svg></span>设置</a>
+      </nav>
+      <div class="side-foot">网页版 · 数据保存在本浏览器<br>数据请定期到「设置」备份<br><span style="opacity:.7">v4.18 · 网页版</span></div>
+    </aside>
+
+    <!-- 主区域 -->
+    <div id="main">
+      <header id="topbar">
+        <div class="flex items-center gap8">
+          <span class="ctx-label">班级：</span>
+          <select id="ctx-class" class="input"></select>
+        </div>
+        <div class="flex items-center gap8">
+          <span class="ctx-label">测试批次：</span>
+          <select id="ctx-batch" class="input" disabled></select>
+        </div>
+        <div class="topbar-right no-print">
+          <button class="btn btn-sm" onclick="window.print()" title="打印当前页面"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"><path d="M7 8V3h10v5"/><path d="M7 16.5H4.5v-6a2.5 2.5 0 012.5-2.5h10a2.5 2.5 0 012.5 2.5v6H17"/><path d="M7 14h10v7H7z"/></svg>打印</button>
+        </div>
+      </header>
+      <main id="view-container"></main>
+    </div>
+  </div>
+
+  <!-- 第三方库（本地文件，离线可用） -->
+  <script src="lib/xlsx.full.min.js?v=58"></script>
+  <script src="lib/echarts.min.js?v=58"></script>
+  <script src="lib/html2canvas.min.js?v=58"></script>
+  <script src="lib/jspdf.umd.min.js?v=58"></script>
+  
+  <!-- 应用脚本：先声明命名空间 -->
+  <script>
+    window.FCS = window.FCS || {};
+  </script>
+  <script src="js/util.js?v=58"></script>
+  <script src="js/scoring.js?v=58"></script>
+  <script src="js/storage.js?v=58"></script>
+  <script src="js/importer.js?v=58"></script>
+  <script src="js/analysis.js?v=58"></script>
+  <script src="js/training.js?v=58"></script>
+  <script src="js/ai-brain.js?v=58"></script>
+  <script src="js/ai-api.js?v=58"></script>
+  <script src="js/report.js?v=58"></script>
+  <script src="js/pdf-export.js?v=58"></script>
+  <script src="js/charts.js?v=58"></script>
+  <script src="js/sample-data.js?v=58"></script>
+  <script src="js/app.js?v=58"></script>
+  <script src="js/ui/ui-common.js?v=58"></script>
+  <script src="js/ui/view-home.js?v=58"></script>
+  <script src="js/ui/view-classes.js?v=58"></script>
+  <script src="js/ui/view-import.js?v=58"></script>
+  <script src="js/ui/view-entry.js?v=58"></script>
+  <script src="js/ui/view-analysis.js?v=58"></script>
+  <script src="js/ui/view-compare.js?v=58"></script>
+  <script src="js/ui/view-student.js?v=58"></script>
+  <script src="js/ui/view-training.js?v=58"></script>
+  <script src="js/ui/view-ai.js?v=58"></script>
+  <script src="js/ui/view-settings.js?v=58"></script>
+  <script src="js/pack-dist.js?v=58"></script>
+  <script>
+    FCS.app.boot();
+  </script>
+</body>
+</html>
