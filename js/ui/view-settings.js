@@ -81,7 +81,7 @@
         "<b>3. 看分析</b><br>班级分析 → 平均分/及格率/各项目得分/优势与薄弱项目<br>" +
         "<b>4. 训练计划</b><br>按薄弱项生成每周1次课的4周计划，可导出PDF<br>" +
         "<b>5. 一个月后复测</b><br>新建复测批次 → 录入新成绩 → 对比分析 → 查看进步与不足<br>" +
-        "<b>6. 备份数据</b><br>数据保存在浏览器中！请定期到本页导出备份文件并妥善保存，清理浏览器数据会丢失软件内的数据<br>" +
+        "<b>6. 备份数据</b><br>数据保存在浏览器中！请定期到本页导出备份文件并妥善保存，清理浏览器数据会丢失软件内的数据<br>" +"<b>7. 演示流程</b><br>加载示例数据 → 班级分析 → 对比分析 → 训练计划 → AI教练（如问“应用化学二班哪些项目最薄弱？”）→ 导入Excel体验<br>" +
         "</div>",
       actions: [{ text: "知道了", primary: true, onClick: function (api) { api.close(); } }],
     });
@@ -121,7 +121,7 @@
         '<div class="sr-desc">查看软件使用步骤说明</div></div>' +
         '<button class="btn" onclick="FCS.settingsUI.help()">查看帮助</button></div>' +
         '<div class="setting-row"><div><div class="sr-title">关于</div>' +
-        '<div class="sr-desc">育健体测数据分析软件 v4.24（网页版）</div></div></div>' +
+        '<div class="sr-desc">育健体测数据分析软件 v4.25（网页版）</div></div></div>' +
         "</div>";
       el.innerHTML = html;
       FCS.aiAPI.fillForm();
