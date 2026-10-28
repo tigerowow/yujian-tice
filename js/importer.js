@@ -29,6 +29,18 @@
   /* 性别列表头识别（含"性别"即视为性别列） */
   const GENDER_HEADERS = ["性别", "学生性别", "男/女"];
 
+  /* 公共成绩项的候选列名（用于从捕获的原始单元格反查，顺序即优先级） */
+  const COMMON_FIELDS = [
+    { key: "height", cols: ["身高"] },
+    { key: "weight", cols: ["体重"] },
+    { key: "vitalCapacity", cols: ["肺活量"] },
+    { key: "run50", cols: ["50米", "50米跑", "50m", "50m跑"] },
+    { key: "standJump", cols: ["立定跳远", "跳远"] },
+    { key: "sitReach", cols: ["坐位体前屈", "体前屈"] },
+  ];
+  const NO_COLS = ["学籍号", "学号"];
+  const NAME_COLS = ["姓名", "学生姓名"];
+
   /* 表头规范化：去除所有空白字符（换行/空格） */
   function normHeader(t) {
     return String(t === null || t === undefined ? "" : t).replace(/\s+/g, "");
@@ -358,6 +370,58 @@
 
   /* 暴露给AI纠错复用：解析单个字段值（含单位/格式/范围校验） */
   IM.parseCell = parseCell;
+
+  /* 由捕获的原始单元格重建一整行（供「手动编辑」纠错复用）
+     cells = captureCells 的输出；override = {studentNo,name,gender} 用户补填的身份信息
+     返回 {ok:true,row} 或 {ok:false,errors,studentNo,name} */
+  IM.buildRowFromCells = function (cells, override) {
+    override = override || {};
+    const cellMap = {};
+    (cells || []).forEach(function (c) { if (c.col) cellMap[c.col] = c.val; });
+    const pick = function (names) {
+      for (let i = 0; i < names.length; i++) {
+        const v = cellMap[names[i]];
+        if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+      }
+      return null;
+    };
+    const errors = [];
+    const noRaw = override.studentNo !== undefined && override.studentNo !== null ? override.studentNo : pick(NO_COLS);
+    const nameRaw = override.name !== undefined && override.name !== null ? override.name : pick(NAME_COLS);
+    const studentNo = String(noRaw === null || noRaw === undefined ? "" : noRaw).trim().replace(/\.0+$/, "");
+    const name = String(nameRaw === null || nameRaw === undefined ? "" : nameRaw).trim();
+    let gender = null;
+    if (override.gender === "male" || override.gender === "female") gender = override.gender;
+    else gender = parseGenderCell(pick(GENDER_HEADERS));
+    if (!studentNo) errors.push("缺少学籍号");
+    if (!name) errors.push("缺少姓名");
+    if (!gender) errors.push("性别无法识别");
+    const raw = {};
+    COMMON_FIELDS.forEach(function (f) {
+      const v = pick(f.cols);
+      if (v === null) return;
+      const p = parseCell(f.key, v);
+      if (!p.ok) errors.push(p.error);
+      else if (p.value !== null && p.value !== undefined) raw[f.key] = p.value;
+    });
+    /* 耐力/力量按性别取对应列（性别未定时无从取值） */
+    if (gender) {
+      const ev = pick(gender === "male" ? GENDER_COLS.maleEndurance : GENDER_COLS.femaleEndurance);
+      const sv = pick(gender === "male" ? GENDER_COLS.maleStrength : GENDER_COLS.femaleStrength);
+      if (ev !== null) {
+        const p = parseCell("endurance", ev);
+        if (!p.ok) errors.push(p.error);
+        else if (p.value) raw.endurance = p.value;
+      }
+      if (sv !== null) {
+        const p = parseCell("strength", sv);
+        if (!p.ok) errors.push(p.error);
+        else if (p.value !== null && p.value !== undefined) raw.strength = p.value;
+      }
+    }
+    if (errors.length) return { ok: false, errors: errors, studentNo: studentNo, name: name };
+    return { ok: true, row: { studentNo: studentNo, name: name, gender: gender, raw: raw } };
+  };
 
   FCS.importer = IM;
 })();

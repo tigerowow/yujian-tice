@@ -96,6 +96,9 @@
     if (topbar) {
       topbar.style.display = (viewId === "classes" || viewId === "compare" || viewId === "settings" || viewId === "ai" || viewId === "home") ? "none" : "flex";
     }
+    /* 「继续录入」按钮只在数据录入页、且已选择班级时出现 */
+    const btnContinue = document.getElementById("btn-continue");
+    if (btnContinue) btnContinue.style.display = (viewId === "entry" && A.ctx.classId) ? "" : "none";
     /* 侧边栏高亮 */
     document.querySelectorAll(".side-nav a").forEach(function (a) {
       a.classList.toggle("active", a.getAttribute("href") === "#/" + viewId);

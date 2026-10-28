@@ -6,7 +6,7 @@
   const data = function () { return FCS.app.data; };
 
   /* 当前解析结果（供AI纠错后重新预览复用） */
-  let currentResult = null, currentFile = null;
+  let currentResult = null, currentFile = null, previewModal = null;
 
   /* 性别专属项目列名（与 importer 的 GENDER_COLS 对应），用于从原始单元格回填 */
   const MALE_ENDURANCE_COLS = ["1000米跑", "1000米", "1000m跑", "1000m"];
@@ -64,6 +64,46 @@
     if (!gender) fieldErrors.push("性别无法识别");
     if (fieldErrors.length) return { ok: false, errors: fieldErrors, studentNo: studentNo, name: name };
     return { ok: true, row: { rowNum: c.rowNum, studentNo: studentNo, name: name, gender: gender, raw: raw } };
+  }
+
+  /* 从原始单元格里按列名取一个显示值（取不到返回空串） */
+  function cellPick(cells, colNames) {
+    for (let i = 0; i < (cells || []).length; i++) {
+      const c = cells[i];
+      if (colNames.indexOf(c.col) >= 0 && String(c.val === null || c.val === undefined ? "" : c.val).trim() !== "") return c.val;
+    }
+    return "";
+  }
+
+  /* 应用手动编辑：按原始单元格重建该行，身份信息用用户填写的值 */
+  function applyManualEdits(errList, overrides) {
+    const result = currentResult;
+    let applied = 0, failed = 0;
+    errList.forEach(function (item, idx) {
+      const e = item.error;
+      const sr = result.sheetRows[item.sheetIdx];
+      const o = overrides[idx] || {};
+      const r = FCS.importer.buildRowFromCells(e.cells, {
+        studentNo: o.studentNo || "",
+        name: o.name || "",
+        gender: o.gender || "",
+      });
+      sr.errors = sr.errors.filter(function (x) { return x.rowNum !== e.rowNum; });
+      if (r.ok) {
+        const dup = sr.rows.some(function (x) { return x.studentNo === r.row.studentNo; });
+        if (dup) {
+          sr.errors.push({ rowNum: e.rowNum, studentNo: r.row.studentNo, name: r.row.name, errors: ["学籍号与本次已导入的学生重复"], cells: e.cells });
+          failed++;
+        } else {
+          sr.rows.push({ rowNum: e.rowNum, studentNo: r.row.studentNo, name: r.row.name, gender: r.row.gender, raw: r.row.raw });
+          applied++;
+        }
+      } else {
+        sr.errors.push({ rowNum: e.rowNum, studentNo: r.studentNo || e.studentNo, name: r.name || e.name, errors: r.errors, cells: e.cells });
+        failed++;
+      }
+    });
+    return { applied: applied, failed: failed };
   }
 
   /* 应用已勾选的修正：从 errors 移到 rows；仍失败的保留在错误区 */
@@ -153,8 +193,28 @@
         totalRows += sr.rows.length;
         totalErrors += sr.errors.length;
       });
+      const classes = FCS.app.data.classes;
+      const noClasses = !classes.length;
+      const curClass = FCS.app.getClass();
       const curBatch = FCS.app.getBatch();
-      const forceNew = !curBatch;
+      const lastBatchId = function (cls) { return cls && cls.batches.length ? cls.batches[cls.batches.length - 1].id : null; };
+      const defClassId = curClass ? curClass.id : (classes[0] ? classes[0].id : "");
+      const defBatchId = curClass ? (curBatch ? curBatch.id : lastBatchId(curClass)) : lastBatchId(classes[0]);
+      const defCls = defClassId ? FCS.storage.findClass(FCS.app.data, defClassId) : null;
+
+      /* 班级下拉：默认选中当前班级 */
+      let classOpts = '<option value="">— 请选择班级 —</option>';
+      classes.forEach(function (c) {
+        classOpts += '<option value="' + c.id + '"' + (c.id === defClassId ? " selected" : "") + ">" + U.esc(c.name) + "</option>";
+      });
+      /* 批次下拉：默认选中当前批次，未选时用该班最新批次 */
+      let batchOpts = '<option value="">— 请选择测试批次 —</option>';
+      if (defCls) {
+        defCls.batches.forEach(function (b) {
+          batchOpts += '<option value="' + b.id + '"' + (b.id === defBatchId ? " selected" : "") + ">" + U.esc(b.name + "（" + b.testDate + "）") + "</option>";
+        });
+      }
+      batchOpts += '<option value="__new__"' + (defBatchId ? "" : " selected") + ">＋ 新建批次</option>";
 
       const body = document.createElement("div");
       body.innerHTML =
@@ -163,12 +223,14 @@
         '<div class="ps-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>可导入学生：<b class="text-success">' + totalRows + "</b></div>" +
         '<div class="ps-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 4L2.5 20h19z"/><path d="M12 10v4"/><circle cx="12" cy="17.2" r="0.6" fill="currentColor" stroke="none"/></svg>错误行：<b class="' + (totalErrors ? "text-danger" : "text-success") + '">' + totalErrors + "</b></div>" +
         "</div>" +
-        '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">' +
-        '<div><label class="field">班级名称</label><input id="imp-class" class="input" style="width:100%" value="' + U.esc(guessValue(result, "classNameGuess") || (FCS.app.getClass() ? FCS.app.getClass().name : "")) + '"></div>' +
-        '<div><label class="field">任课教师</label><input id="imp-teacher" class="input" style="width:100%" value="' + U.esc(guessValue(result, "teacherGuess") || (FCS.app.getClass() ? FCS.app.getClass().teacher : "")) + '"></div>' +
+        '<div class="imp-form">' +
+        '<div><label class="field">班级</label><select id="imp-class-sel" class="input" onchange="FCS.importUI.onClassChange()">' + classOpts + "</select></div>" +
+        '<div><label class="field">测试批次</label><select id="imp-batch-sel" class="input" onchange="FCS.importUI.onBatchChange()">' + batchOpts + "</select></div>" +
         "</div>" +
-        '<label style="display:block;margin-bottom:10px"><input type="checkbox" id="imp-new" ' + (forceNew ? "checked disabled" : "") + "> 导入到新建班级（当前班级：" + (FCS.app.getClass() ? U.esc(FCS.app.getClass().name) : "无") + "）</label>" +
-        "<div class='text-sm text-2 mb8'>导入到当前批次：" + (curBatch ? U.esc(curBatch.name) : "（当前未选择批次，将自动新建）") + "</div>";
+        '<div id="imp-batch-name-wrap" style="display:none;margin-bottom:10px"><label class="field">新批次名称</label><input id="imp-batch-name" class="input" style="width:100%" value="导入批次"></div>' +
+        '<div style="margin-bottom:10px"><label class="field">任课教师（可选，填写则更新该班级教师）</label><input id="imp-teacher" class="input" style="width:100%" value="' + U.esc((defCls && defCls.teacher) || guessValue(result, "teacherGuess") || "") + '"></div>' +
+        '<label class="flex items-center gap8" style="display:flex;margin-bottom:10px"><input type="checkbox" id="imp-new"' + (noClasses ? " checked disabled" : "") + ' onchange="FCS.importUI.onNewClassToggle()"> 导入到新建班级' +
+        '<input id="imp-class" class="input" style="width:240px" placeholder="新班级名称" value="' + U.esc(guessValue(result, "classNameGuess") || "") + '"' + (noClasses ? "" : " disabled") + "></label>";
 
       const modeBadge = {
         genderCol: ["badge-male", "✓ 按性别列自动识别"],
@@ -176,7 +238,7 @@
         sheet: ["badge-male", "✓ 按工作表名识别"],
         manual: ["badge-fail", "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M12 4L2.5 20h19z\"/><path d=\"M12 10v4\"/><circle cx=\"12\" cy=\"17.2\" r=\"0.6\" fill=\"currentColor\" stroke=\"none\"/></svg>需手动选择"],
       };
-      body.innerHTML += '<div class="mb8 bold">工作表与性别识别：</div>';
+      body.innerHTML += '<div class="mb8 bold">性别识别：</div>';
       result.sheetRows.forEach(function (sr) {
         const maleCnt = sr.rows.filter(function (x) { return x.gender === "male"; }).length;
         const femaleCnt = sr.rows.filter(function (x) { return x.gender === "female"; }).length;
@@ -192,7 +254,7 @@
           sel = '<span class="badge ' + mb[0] + '">' + mb[1] + "</span>";
         }
         body.innerHTML += '<div class="flex items-center gap8 mb8" style="font-size:14px">' +
-          "工作表「" + U.esc(sr.sheetName) + "」：" + sel +
+          "「" + U.esc(sr.sheetName) + "」：" + sel +
           '<span class="text-2">共 ' + sr.rows.length + " 人（男 " + maleCnt + " / 女 " + femaleCnt + "）</span></div>";
       });
 
@@ -202,7 +264,10 @@
 
       if (totalErrors) {
         let errHtml = '<div class="bold mb8 text-danger">错误行（共 ' + totalErrors + ' 行，将不会导入）：</div>' +
-          '<button class="btn mb8" onclick="FCS.importUI.aiCorrect()">🤖 AI智能纠错（' + totalErrors + ' 行）</button>' +
+          '<div class="flex gap8 mb8">' +
+          '<button class="btn" onclick="FCS.importUI.aiCorrect()"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5zM8.3 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM13.7 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM19.1 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6z"/></svg>AI智能纠错（' + totalErrors + ' 行）</button>' +
+          '<button class="btn" onclick="FCS.importUI.manualEdit()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 000-3l-1-1a2.1 2.1 0 00-3 0L4 16z"/><path d="M13.5 6.5l3 3"/></svg>手动编辑（' + totalErrors + ' 行）</button>' +
+          "</div>" +
           '<div class="import-errors"><ul>';
         result.sheetRows.forEach(function (sr) {
           sr.errors.slice(0, 50).forEach(function (e) {
@@ -213,7 +278,10 @@
         body.innerHTML += errHtml + "</ul></div>";
       }
 
-      U.showModal({
+      FCS.importUI.syncImportForm();
+      /* 重新预览时先关掉上一个预览弹窗（避免手动编辑/纠错后弹窗叠加） */
+      if (previewModal) { previewModal.close(); previewModal = null; }
+      previewModal = U.showModal({
         title: "导入预览：" + file.name,
         body: body,
         width: "640px",
@@ -229,27 +297,26 @@
               });
               if (genderMissing) { U.toast("请为每个工作表指定性别", "warn"); return; }
               const d = data();
-              const createNew = document.getElementById("imp-new").checked || forceNew;
-              const className = document.getElementById("imp-class").value.trim() || "未命名班级";
+              const createNew = document.getElementById("imp-new").checked;
               const teacher = document.getElementById("imp-teacher").value.trim();
-              let targetClassId = FCS.app.ctx.classId;
-              let targetBatchId = FCS.app.ctx.batchId;
-              if (createNew || !targetBatchId) {
-                if (createNew) {
-                  const cls = FCS.storage.createClass(d, { name: className, teacher: teacher });
-                  targetClassId = cls.id;
-                  targetBatchId = null;
-                } else if (!targetClassId) {
-                  const cls = FCS.storage.createClass(d, { name: className, teacher: teacher });
-                  targetClassId = cls.id;
-                }
-                const batchName = createNew ? (curBatch ? className + "（导入）" : "导入批次") : (FCS.storage.findBatch(d, targetClassId, targetBatchId) ? FCS.storage.findBatch(d, targetClassId, targetBatchId).name : "导入批次");
-                const b = FCS.storage.createBatch(d, targetClassId, { name: batchName, testDate: U.today() });
-                targetBatchId = b.id;
+              let targetClassId = null, targetBatchId = null;
+              if (createNew) {
+                const className = document.getElementById("imp-class").value.trim();
+                if (!className) { U.toast("请填写新班级的名称", "warn"); return; }
+                const cls = FCS.storage.createClass(d, { name: className, teacher: teacher });
+                targetClassId = cls.id;
               } else {
+                targetClassId = document.getElementById("imp-class-sel").value;
+                if (!targetClassId) { U.toast("请选择导入到哪个班级，或勾选「导入到新建班级」", "warn"); return; }
+                const sel = document.getElementById("imp-batch-sel").value;
+                if (!sel) { U.toast("请选择导入到哪个测试批次", "warn"); return; }
+                if (sel !== "__new__") targetBatchId = sel;
                 const cls = FCS.storage.findClass(d, targetClassId);
-                if (cls && document.getElementById("imp-class").value.trim()) cls.name = className;
                 if (cls && teacher) cls.teacher = teacher;
+              }
+              if (!targetBatchId) {
+                const bn = (document.getElementById("imp-batch-name").value || "").trim() || "导入批次";
+                targetBatchId = FCS.storage.createBatch(d, targetClassId, { name: bn, testDate: U.today() }).id;
               }
               const mode = (body.querySelector('input[name="imp-mode"]:checked') || {}).value || "update";
               const r = FCS.importer.applyImport({
@@ -265,6 +332,119 @@
               FCS.app.setBatch(targetBatchId);
               FCS.app.navigate("#/entry");
               U.toast("导入完成：新增 " + r.added + " 人，更新 " + r.updated + " 人，跳过 " + r.skipped + " 人" + (totalErrors ? "（" + totalErrors + " 行错误未导入）" : ""), "success");
+            },
+          },
+        ],
+      });
+    },
+
+    /* 同步导入表单联动：「导入到新建班级」勾选状态 ↔ 班级/批次下拉、新班级名输入框 */
+    syncImportForm: function () {
+      const newChk = document.getElementById("imp-new");
+      const classSel = document.getElementById("imp-class-sel");
+      const batchSel = document.getElementById("imp-batch-sel");
+      const nameInput = document.getElementById("imp-class");
+      const batchWrap = document.getElementById("imp-batch-name-wrap");
+      if (!newChk || !classSel || !batchSel || !nameInput || !batchWrap) return;
+      const noClasses = !FCS.app.data.classes.length;
+      const createNew = newChk.checked || noClasses;
+      newChk.disabled = noClasses;
+      classSel.disabled = createNew;
+      batchSel.disabled = createNew;
+      nameInput.disabled = !createNew;
+      if (createNew) batchWrap.style.display = "";
+      else batchWrap.style.display = batchSel.value === "__new__" ? "" : "none";
+    },
+    onNewClassToggle: function () { FCS.importUI.syncImportForm(); },
+    onBatchChange: function () { FCS.importUI.syncImportForm(); },
+    /* 切换班级：联动更新批次下拉与教师 */
+    onClassChange: function () {
+      const U = FCS.util;
+      const classSel = document.getElementById("imp-class-sel");
+      const batchSel = document.getElementById("imp-batch-sel");
+      if (!classSel || !batchSel) return;
+      const cls = classSel.value ? FCS.storage.findClass(FCS.app.data, classSel.value) : null;
+      let h = '<option value="">— 请选择测试批次 —</option>';
+      if (cls) {
+        cls.batches.forEach(function (b) {
+          h += '<option value="' + b.id + '">' + U.esc(b.name + "（" + b.testDate + "）") + "</option>";
+        });
+      }
+      h += '<option value="__new__">＋ 新建批次</option>';
+      batchSel.innerHTML = h;
+      if (!cls) batchSel.value = "";
+      else if (cls.batches.length) batchSel.value = cls.batches[cls.batches.length - 1].id;
+      else batchSel.value = "__new__";
+      const t = document.getElementById("imp-teacher");
+      if (t && cls) t.value = cls.teacher || "";
+      FCS.importUI.syncImportForm();
+    },
+
+    /* 手动编辑：错误行逐行补填身份信息（姓名/学籍号/性别） */
+    manualEdit: function () {
+      const U = FCS.util;
+      const result = currentResult;
+      if (!result) return;
+      const errList = [];
+      result.sheetRows.forEach(function (sr, si) {
+        (sr.errors || []).forEach(function (e) { errList.push({ sheetIdx: si, error: e }); });
+      });
+      if (!errList.length) { U.toast("没有需要编辑的错误行", "warn"); return; }
+      FCS.importUI.showManualEdit(errList);
+    },
+
+    showManualEdit: function (errList) {
+      const U = FCS.util;
+      const esc = U.esc;
+      const body = document.createElement("div");
+      let html = '<div class="text-sm text-2 mb8">共 <b>' + errList.length + '</b> 行有错误。可直接补填或修改 <b>姓名、学籍号、性别</b>；其他成绩数值的错误请回 Excel 修改后重新导入。</div>';
+      errList.forEach(function (item, idx) {
+        const e = item.error;
+        const cells = e.cells || [];
+        const noV = cellPick(cells, ["学籍号", "学号"]);
+        const nameV = cellPick(cells, ["姓名", "学生姓名"]);
+        const genderV = String(cellPick(cells, ["性别", "学生性别", "男/女"]) || "");
+        const gm = genderV.indexOf("男") >= 0;
+        const gf = genderV.indexOf("女") >= 0;
+        const originals = cells.map(function (cc) { return cc.col + "=" + cc.val; }).join("，");
+        html += '<div class="ai-fix-card">' +
+          '<div class="ai-fix-head">第 <b>' + e.rowNum + '</b> 行 <span class="text-danger">' + esc(e.errors.join("、")) + "</span></div>" +
+          '<div class="ai-fix-fields">' +
+          '<label class="field">姓名<input class="input me-name" data-idx="' + idx + '" value="' + esc(nameV) + '" placeholder="请补充姓名"' + (nameV ? "" : ' style="border-color:var(--danger)"') + "></label>" +
+          '<label class="field">学籍号<input class="input me-no" data-idx="' + idx + '" value="' + esc(noV) + '" placeholder="请补充学籍号"' + (noV ? "" : ' style="border-color:var(--danger)"') + "></label>" +
+          '<label class="field">性别<select class="input me-gender" data-idx="' + idx + '"' + (!gm && !gf ? ' style="border-color:var(--danger)"' : "") + ">" +
+          '<option value=""' + (!gm && !gf ? " selected" : "") + ">请选择</option>" +
+          '<option value="male"' + (gm ? " selected" : "") + ">男</option>" +
+          '<option value="female"' + (gf ? " selected" : "") + ">女</option>" +
+          "</select></label>" +
+          "</div>" +
+          '<div class="text-sm text-2">原始：' + esc(originals || "（无原始值）") + "</div>" +
+          "</div>";
+      });
+      body.innerHTML = html;
+      U.showModal({
+        title: "手动编辑错误行",
+        body: body,
+        width: "660px",
+        actions: [
+          { text: "取消", onClick: function (api) { api.close(); FCS.importUI.renderPreview(); } },
+          {
+            text: "应用并重新预览", primary: true, onClick: function (api) {
+              const overrides = {};
+              errList.forEach(function (item, idx) {
+                const nameEl = body.querySelector('.me-name[data-idx="' + idx + '"]');
+                const noEl = body.querySelector('.me-no[data-idx="' + idx + '"]');
+                const gEl = body.querySelector('.me-gender[data-idx="' + idx + '"]');
+                overrides[idx] = {
+                  name: nameEl ? nameEl.value.trim() : "",
+                  studentNo: noEl ? noEl.value.trim() : "",
+                  gender: gEl ? gEl.value : "",
+                };
+              });
+              api.close();
+              const r = applyManualEdits(errList, overrides);
+              U.toast("已修正 " + r.applied + " 行" + (r.failed ? "，仍有 " + r.failed + " 行存在错误" : ""), r.failed ? "warn" : "success");
+              FCS.importUI.renderPreview();
             },
           },
         ],

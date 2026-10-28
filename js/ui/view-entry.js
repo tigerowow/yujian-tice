@@ -135,6 +135,11 @@
     const el = document.getElementById("inp-" + s.id + "-studentNo");
     if (el) { el.focus(); el.scrollIntoView({ block: "center" }); }
   };
+  /* 「继续录入」：清空当前班级/批次选择，回到录入方式选择（三个入口）界面 */
+  FCS.entryEdit.continueEntry = function () {
+    FCS.app.setClass(null); /* 会同时清空批次、写入 ui.lastClassId=null 并重绘 */
+    FCS.app.navigate("#/entry");
+  };
   /* 手动录入入口（未选班级/批次时）：快速新建班级+第一个测试批次后进入录入页 */
   FCS.entryEdit.manualEntry = function () {
     const U = FCS.util;

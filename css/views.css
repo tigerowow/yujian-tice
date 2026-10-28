@@ -69,6 +69,7 @@
 /* 导入预览 */
 .preview-stats { display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
 .preview-stats .ps-item { font-size: 14px; }
+.imp-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
 .import-errors { max-height: 200px; overflow: auto; background: var(--danger-bg); border-radius: 8px; padding: 10px 14px; font-size: 13px; }
 .import-errors li { color: var(--danger); }
 
