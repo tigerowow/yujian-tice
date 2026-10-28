@@ -199,8 +199,66 @@
     return chart;
   };
 
-  /* 雷达图。indicators: [{name,max}]；seriesList: [{name, values(与indicators对齐的数组), color}] */
-  C.renderRadar = function (dom, indicators, seriesList, opts) {
+  /* 成长曲线（折线）：该生总分随各次测试批次变化。
+     categories: 批次名数组；seriesList: [{name, values(与categories对齐，缺项传null), color}]
+     单条线时自动画 及格60 / 良好80 / 优秀90 三条参考线 */
+  C.renderTrendLine = function (dom, categories, seriesList, opts) {
+    opts = opts || {};
+    const chart = C.create(dom);
+    const single = seriesList.length === 1;
+    const hasPoint = seriesList.some(function (s) {
+      return (s.values || []).some(function (v) { return v !== null && v !== undefined; });
+    });
+    const option = {
+      animation: false,
+      textStyle: { fontFamily: FONT },
+      title: { text: opts.title || "总分成长曲线", left: "center", top: 0, textStyle: { fontSize: 14, color: "#1f3a57" } },
+      tooltip: {
+        trigger: "axis",
+        valueFormatter: function (v) { return v === null || v === undefined ? "缺项" : v + " 分"; },
+      },
+      legend: single ? undefined : { bottom: 0 },
+      grid: single ? { left: 8, right: 70, top: 40, bottom: 8, containLabel: true } : GRID_WITH_LEGEND,
+      /* boundaryGap:true → 数据点落在分类带中央，首尾标签不会被裁掉，也不与参考线标签重叠 */
+      xAxis: { type: "category", data: categories, boundaryGap: true, axisLabel: { fontSize: 12 } },
+      yAxis: { type: "value", min: 0, max: 100, name: "总分", nameGap: 10, axisLabel: { fontSize: 12 }, minInterval: 10 },
+      series: hasPoint ? seriesList.map(function (s) {
+        return {
+          name: s.name,
+          type: "line",
+          data: s.values,
+          smooth: true,
+          symbol: "circle",
+          symbolSize: 10,
+          connectNulls: false,
+          itemStyle: { color: s.color || C.COLORS.blue },
+          lineStyle: { color: s.color || C.COLORS.blue, width: 3 },
+          label: {
+            show: true, position: "top", fontSize: 12, fontWeight: "bold",
+            formatter: function (p) { return p.value === null || p.value === undefined ? "" : p.value; },
+          },
+          markLine: single ? {
+            silent: true, symbol: "none",
+            label: { formatter: "{b}", fontSize: 11, position: "insideEndTop", color: "#8aa5c2" },
+            lineStyle: { type: "dashed", width: 1, color: "#c9ddef" },
+            data: [
+              { yAxis: 60, name: "及格 60", lineStyle: { color: "#fab219" } },
+              { yAxis: 80, name: "良好 80", lineStyle: { color: "#2a78d6" } },
+              { yAxis: 90, name: "优秀 90", lineStyle: { color: "#0ca30c" } },
+            ],
+          } : undefined,
+        };
+      }) : [],
+      graphic: hasPoint ? undefined : {
+        type: "text", left: "center", top: "middle",
+        style: { text: "暂无完整成绩，无法绘制成长曲线", fill: "#8aa5c2", fontSize: 14 },
+      },
+    };
+    chart.setOption(option);
+    return chart;
+  };
+
+  /* 雷达图。indicators: [{name,max}]；seriesList: [{name, values(与indicators对齐的数组), color}] */  C.renderRadar = function (dom, indicators, seriesList, opts) {
     opts = opts || {};
     const chart = C.create(dom);
     const allEmpty = seriesList.every(function (s) {

@@ -395,6 +395,17 @@
       h += row(cells);
       h += tableEnd();
     }
+
+    /* 个人成长曲线（该生历次测试总分折线） */
+    if (opts.trendPng || (opts.history && opts.history.length > 1)) {
+      h += h2((opts.compare ? "五" : "四") + "、个人成长曲线");
+      if (opts.history && opts.history.length) {
+        h += p(opts.history.map(function (x) {
+          return U.esc(x.name) + " " + (x.total !== null ? x.total + " 分" : "缺项");
+        }).join("　➜　"), "#5a7a9c");
+      }
+      if (opts.trendPng) h += img(opts.trendPng, 620);
+    }
     return h;
   };
 

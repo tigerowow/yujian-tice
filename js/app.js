@@ -91,10 +91,10 @@
     const parts = hash.replace(/^#\//, "").split("/");
     const viewId = parts[0];
     const view = A.views[viewId] || A.views.home;
-    /* 顶栏：班级管理/对比分析/设置页面用不到班级与批次选择器，隐藏顶栏 */
+    /* 顶栏：班级管理/对比分析/设置/个人报告页用不到班级与批次选择器，隐藏顶栏 */
     const topbar = document.getElementById("topbar");
     if (topbar) {
-      topbar.style.display = (viewId === "classes" || viewId === "compare" || viewId === "settings" || viewId === "ai" || viewId === "home") ? "none" : "flex";
+      topbar.style.display = (viewId === "classes" || viewId === "compare" || viewId === "settings" || viewId === "ai" || viewId === "home" || viewId === "student") ? "none" : "flex";
     }
     /* 「继续录入」按钮只在数据录入页、且已选择班级时出现 */
     const btnContinue = document.getElementById("btn-continue");
