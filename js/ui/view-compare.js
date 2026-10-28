@@ -171,40 +171,62 @@
     const U = FCS.util;
     const UC = FCS.uiCommon;
     const esc = U.esc;
-    const batches = cls.batches;
-    if (batches.length < 2) {
+    /* 批次不足2个（含未选班级）时，仍渲染完整板块骨架，数据位显示"—" */
+    const batches = cls ? cls.batches : [];
+    const noCtx = batches.length < 2;
+    if (noCtx) {
       currentChart = null;
-      el.innerHTML = UC.empty(
-        "同一班级纵向对比：用同一班级的两次测试批次（如9月初测与10月复测）对比每名学生的进步与退步。<br>当前班级只有 " + batches.length + " 个测试批次，至少需要 2 个才能对比。",
-        '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">去新建复测批次</button>');
-      return;
+    } else {
+      if (!state.batchA || !batches.some(function (b) { return b.id === state.batchA; })) state.batchA = batches[0].id;
+      if (!state.batchB || !batches.some(function (b) { return b.id === state.batchB; })) state.batchB = batches[batches.length - 1].id;
+      if (state.batchA === state.batchB) {
+        state.batchB = batches[batches.length - 1].id === state.batchA ? batches[0].id : batches[batches.length - 1].id;
+      }
     }
-    if (!state.batchA || !batches.some(function (b) { return b.id === state.batchA; })) state.batchA = batches[0].id;
-    if (!state.batchB || !batches.some(function (b) { return b.id === state.batchB; })) state.batchB = batches[batches.length - 1].id;
-    if (state.batchA === state.batchB) {
-      state.batchB = batches[batches.length - 1].id === state.batchA ? batches[0].id : batches[batches.length - 1].id;
-    }
-    const bA = batches.find(function (b) { return b.id === state.batchA; });
-    const bB = batches.find(function (b) { return b.id === state.batchB; });
+    const emptyBatch = function (n) { return { id: "__empty" + n, name: "未选择批次", testDate: "", students: [] }; };
+    const bA = noCtx ? emptyBatch(1) : batches.find(function (b) { return b.id === state.batchA; });
+    const bB = noCtx ? emptyBatch(2) : batches.find(function (b) { return b.id === state.batchB; });
 
-    let html = '<div class="compare-pair-select">' +
-      '<div class="cp-item"><label class="field">对比批次一（上次）</label><select class="input" onchange="FCS.compareUI.setBatchA(this.value)">' +
-      batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchA ? " selected" : "") + ">" + esc(b.name + "（" + b.testDate + "）") + "</option>"; }).join("") +
-      "</select></div>" +
-      '<div class="cp-item"><label class="field">对比批次二（本次）</label><select class="input" onchange="FCS.compareUI.setBatchB(this.value)">' +
-      batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchB ? " selected" : "") + ">" + esc(b.name + "（" + b.testDate + "）") + "</option>"; }).join("") +
-      "</select></div>" +
+    let html = "";
+    if (noCtx) {
+      html += '<div class="card mb16"><div class="empty-tip">' +
+        "同一班级纵向对比：用同一班级的两次测试批次（如9月初测与10月复测）对比每名学生的进步与退步。<br>" +
+        (cls
+          ? "当前班级只有 " + batches.length + " 个测试批次，至少需要 2 个才能对比。"
+          : "尚未选择班级与测试批次：请先在顶栏选择。以下是本页各个板块。") +
+        '</div><div style="text-align:center;padding-bottom:20px">' +
+        '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">' + (cls ? "去新建复测批次" : "去班级管理") + "</button></div></div>";
+    }
+
+    html += '<div class="compare-pair-select">' +
+      '<div class="cp-item"><label class="field">对比批次一（上次）</label>' +
+      (noCtx
+        ? '<select class="input" disabled><option>— 未选择批次 —</option></select>'
+        : '<select class="input" onchange="FCS.compareUI.setBatchA(this.value)">' +
+          batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchA ? " selected" : "") + ">" + esc(b.name + "（" + b.testDate + "）") + "</option>"; }).join("") +
+          "</select>") +
+      "</div>" +
+      '<div class="cp-item"><label class="field">对比批次二（本次）</label>' +
+      (noCtx
+        ? '<select class="input" disabled><option>— 未选择批次 —</option></select>'
+        : '<select class="input" onchange="FCS.compareUI.setBatchB(this.value)">' +
+          batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchB ? " selected" : "") + ">" + esc(b.name + "（" + b.testDate + "）") + "</option>"; }).join("") +
+          "</select>") +
+      "</div>" +
       '<div class="text-sm text-2">按学籍号自动匹配同一学生</div></div>';
 
     const cmp = FCS.analysis.compareBatches(bA, bB);
 
-    /* 总体变化卡 */
+    /* 总体变化卡（无数据时数值与说明都显示"—"） */
+    const nOrDash = function (v, suffix) { return v === null || v === undefined ? "—" : v + (suffix || ""); };
+    const passDelta = (cmp.statsA.total.passRate !== null && cmp.statsB.total.passRate !== null)
+      ? Math.round((cmp.statsB.total.passRate - cmp.statsA.total.passRate) * 10) / 10 : null;
     html += '<div class="stat-row">' +
       UC.statCard("全班平均分变化", cmp.classAvgDelta !== null ? (cmp.classAvgDelta > 0 ? "+" : "") + cmp.classAvgDelta + " 分" : "—",
-        cmp.statsA.total.avg + " → " + cmp.statsB.total.avg + " 分",
-        cmp.classAvgDelta !== null && cmp.classAvgDelta >= 0 ? "highlight" : "danger") +
-      UC.statCard("及格率变化", cmp.statsB.total.passRate !== null && cmp.statsA.total.passRate !== null ? ((cmp.statsB.total.passRate - cmp.statsA.total.passRate) > 0 ? "+" : "") + Math.round((cmp.statsB.total.passRate - cmp.statsA.total.passRate) * 10) / 10 + "%" : "—",
-        cmp.statsA.total.passRate + "% → " + cmp.statsB.total.passRate + "%") +
+        nOrDash(cmp.statsA.total.avg) + " → " + nOrDash(cmp.statsB.total.avg) + " 分",
+        cmp.classAvgDelta === null ? "" : (cmp.classAvgDelta >= 0 ? "highlight" : "danger")) +
+      UC.statCard("及格率变化", passDelta !== null ? (passDelta > 0 ? "+" : "") + passDelta + "%" : "—",
+        nOrDash(cmp.statsA.total.passRate, "%") + " → " + nOrDash(cmp.statsB.total.passRate, "%")) +
       UC.statCard("进步人数", cmp.improved.length, "总分提高≥1分") +
       UC.statCard("退步人数", cmp.declined.length, "总分下降≥1分", cmp.declined.length > cmp.improved.length ? "danger" : "") +
       "</div>";
@@ -216,7 +238,8 @@
     const mkList = function (title, list, tone) {
       let h = '<div class="card mb16"><div class="card-title">' + title + "（" + list.length + " 人）</div>";
       if (!list.length) {
-        h += '<div class="text-2" style="padding:6px 0 10px">本批次对比中没有此类学生（总分变化均不足1分）</div>';
+        h += '<div class="text-2" style="padding:6px 0 10px">' +
+          (noCtx ? "选择班级与两次测试批次后，这里显示进步（或退步）名单。" : "本批次对比中没有此类学生（总分变化均不足1分）") + "</div>";
       } else {
         h += '<div class="table-wrap" style="max-height:260px"><table class="tbl"><thead><tr><th>学籍号</th><th>姓名</th><th>上次总分</th><th>本次总分</th><th>变化</th></tr></thead><tbody>';
         list.forEach(function (m) {
@@ -256,11 +279,18 @@
       html += "<td>" + (m.before.total !== null ? m.before.total : "缺项") + "</td>" +
         "<td>" + (m.after.total !== null ? m.after.total : "缺项") + "</td><td class='bold'>" + deltaHtml(m.totalDelta) + "</td></tr>";
     });
+    if (!detailList.length) {
+      html += '<tr><td colspan="' + (6 + FCS.charts.axisDefs().length) + '" class="text-2" style="text-align:center;padding:16px">' +
+        (noCtx ? "选择班级与两次测试批次后，这里显示每名学生各项目与总分的逐项变化。"
+               : (kw ? "没有匹配「" + esc(kw) + "」的学生" : "没有可对比的学生（需要两次批次中有相同学籍号的学生）")) +
+        "</td></tr>";
+    }
     html += "</tbody></table></div>";
     html += "</div>";
     el.innerHTML = html;
     FCS.charts.disposeAll();
-    currentChart = FCS.charts.renderCompareBars(document.getElementById("ch-cmp"), cmp.statsA, cmp.statsB, { labelA: bA.name, labelB: bB.name });
+    const cmpChart = FCS.charts.renderCompareBars(document.getElementById("ch-cmp"), cmp.statsA, cmp.statsB, { labelA: bA.name, labelB: bB.name });
+    currentChart = noCtx ? null : cmpChart;
     /* 搜索输入框保持焦点（输入即重绘，恢复焦点避免打字中断） */
     if (kw) {
       const si = document.getElementById("long-search");
@@ -274,38 +304,45 @@
   /* ---- ② 不同班级横向对比（多班级） ---- */
   function renderInterclass(el) {
     const U = FCS.util;
-    const UC = FCS.uiCommon;
     const esc = U.esc;
     const d = data();
-    if (d.classes.length < 2) {
-      currentChart = null;
-      el.innerHTML = UC.empty(
-        "不同班级横向对比：对比各班最新测试批次的平均分、及格率、优良率。<br>当前只有 " + d.classes.length + " 个班级，再新建一个班级并录入成绩后即可进行对比。",
-        '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">去新建班级</button>');
-      return;
-    }
-    /* 勾选班级（每班用其最近批次） */
     const selected = d.classes.filter(function (c) { return state.classSel[c.id]; });
-    let html = '<div class="card mb16"><div class="card-title">选择对比班级（使用各班最新测试批次）</div><div class="flex flex-wrap gap8">';
-    d.classes.forEach(function (c) {
-      const latest = c.batches.length ? c.batches[c.batches.length - 1] : null;
-      html += '<label class="focus-chip' + (state.classSel[c.id] ? " on" : "") + '" onclick="FCS.compareUI.toggleClass(\'' + c.id + '\')">' +
-        esc(c.name) + "（" + (latest ? latest.students.length + "人" : "无批次") + "）</label>";
-    });
-    html += "</div></div>";
-    if (selected.length < 2) {
-      currentChart = null;
-      html += UC.empty("请在下方勾选要对比的班级（至少 2 个），勾选后即可看到班级间对比图。");
-      el.innerHTML = html;
-      return;
-    }
     const pairs = selected.map(function (c) {
       return { className: c.name, batch: c.batches[c.batches.length - 1] };
     }).filter(function (p) { return p.batch && p.batch.students.length; });
-    if (pairs.length < 2) {
+
+    /* 选择对比班级（每班用其最近批次）：班级不足2个时也保留此板块 */
+    let html = '<div class="card mb16"><div class="card-title">选择对比班级（使用各班最新测试批次）</div><div class="flex flex-wrap gap8">';
+    if (!d.classes.length) {
+      html += '<span class="text-sm text-2">还没有班级，请先到「班级管理」新建班级并录入成绩。</span>';
+    } else {
+      d.classes.forEach(function (c) {
+        const latest = c.batches.length ? c.batches[c.batches.length - 1] : null;
+        html += '<label class="focus-chip' + (state.classSel[c.id] ? " on" : "") + '" onclick="FCS.compareUI.toggleClass(\'' + c.id + '\')">' +
+          esc(c.name) + "（" + (latest ? latest.students.length + "人" : "无批次") + "）</label>";
+      });
+    }
+    html += "</div></div>";
+
+    /* 数据不足：仍渲染完整板块骨架（图表框 + 明细表表头），仅数据位为空 */
+    if (d.classes.length < 2 || pairs.length < 2) {
       currentChart = null;
-      html += UC.empty("所选班级中至少 2 个需要有学生数据（其余班级可先到「数据录入」导入成绩）。");
+      const hint = d.classes.length < 2
+        ? "不同班级横向对比：对比各班最新测试批次的平均分、及格率、优良率。<br>当前只有 " + d.classes.length + " 个班级，再新建一个班级并录入成绩后即可进行对比。"
+        : "请在下方勾选要对比的班级（至少 2 个），勾选后即可看到班级间对比图。<br>所选班级中至少 2 个需要有学生数据（其余班级可先到「数据录入」导入成绩）。";
+      html += '<div class="card mb16"><div class="empty-tip">' + hint + "</div>" +
+        (d.classes.length < 2
+          ? '<div style="text-align:center;padding-bottom:20px"><button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">去新建班级</button></div>'
+          : "") +
+        "</div>";
+      html += '<div class="card mb16"><div id="ch-cls" class="chart-box" style="height:340px"></div></div>';
+      html += '<div class="card"><div class="card-title">班级对比明细</div><div class="table-wrap"><table class="tbl"><thead><tr>' +
+        "<th>班级</th><th>批次</th><th>人数</th><th>平均分</th><th>及格率</th><th>优良率</th><th>优秀人数</th></tr></thead><tbody>" +
+        '<tr><td colspan="7" class="text-2" style="text-align:center;padding:16px">至少需要 2 个有学生数据的班级，这里会显示各班对比明细。</td></tr>' +
+        "</tbody></table></div></div>";
       el.innerHTML = html;
+      FCS.charts.disposeAll();
+      FCS.charts.renderClassBar(document.getElementById("ch-cls"), [], { title: "班级平均分与及格率对比" });
       return;
     }
     const cmp = FCS.analysis.compareClasses(pairs);
@@ -357,16 +394,10 @@
         renderInterclass(wrap);
         return;
       }
-      /* 纵向对比需要选择班级 */
-      const batch = FCS.app.getBatch();
-      if (!batch) {
-        el.innerHTML = html + '<div class="card"><div class="empty-tip">请先在顶栏选择班级和测试批次。</div></div>';
-        return;
-      }
+      /* 纵向对比：未选班级/批次时也渲染完整板块骨架（renderLongitudinal 内部处理） */
       el.innerHTML = html;
       const wrap = document.createElement("div");
       el.appendChild(wrap);
-      if (!cls) { wrap.innerHTML = ""; return; }
       renderLongitudinal(wrap, cls);
     },
   });

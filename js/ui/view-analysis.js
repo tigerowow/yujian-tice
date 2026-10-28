@@ -48,24 +48,27 @@
       const esc = U.esc;
       const batch = FCS.app.getBatch();
       const cls = FCS.app.getClass();
-      if (!batch) {
-        el.innerHTML = UC.needContext("请先在顶栏选择班级和测试批次，或到「班级管理」新建。");
-        return;
-      }
-      const stats = FCS.analysis.batchStats(batch);
+      /* 未选择班级/批次时也渲染完整板块（用空批次），便于首次使用就能看到本页有哪些板块 */
+      const noCtx = !batch;
+      const useBatch = batch || { id: "__empty", name: "未选择批次", testDate: "", note: "", students: [] };
+      const stats = FCS.analysis.batchStats(useBatch);
       const suggestions = collectSuggestions(stats);
       const weakAll = FCS.analysis.weakItems(stats, { gender: "all" });
       const hasComplete = stats.total.completeCount > 0;
 
-      let html = UC.viewHead("班级分析", esc((cls ? cls.name : "") + "  ·  " + batch.name + "  ·  " + batch.testDate),
+      let html = UC.viewHead("班级分析",
+        noCtx ? "未选择班级与测试批次 · 请先在顶栏选择（以下是本页各板块）"
+              : esc((cls ? cls.name : "") + "  ·  " + useBatch.name + "  ·  " + useBatch.testDate),
         '<button class="btn btn-primary" onclick="FCS.analysisUI.exportReport()" ' + (!hasComplete ? "disabled" : "") + "><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M6 2.5h9l5 5V21.5H6z\"/><path d=\"M14 2.5v5h5\"/></svg>导出PDF报告</button>" +
         '<button class="btn" onclick="FCS.app.navigate(\'#/training\')"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><circle cx=\"12\" cy=\"9\" r=\"5.2\"/><path d=\"M8.4 13.6L6.8 21l5.2-2.8L17.2 21l-1.6-7.4z\"/></svg>生成训练计划</button>');
 
       if (!stats.total.count) {
-        html += UC.empty("该批次还没有学生数据，请先到「数据录入」导入或录入成绩。",
-          '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/entry\')">去录入成绩</button>');
-        el.innerHTML = html;
-        return;
+        html += '<div class="card mb16"><div class="empty-tip">' +
+          (noCtx
+            ? "尚未选择班级与测试批次：下面是本页各个板块，选择班级并录入成绩后会自动填充。"
+            : "该批次还没有学生数据，请先到「数据录入」导入或录入成绩。") +
+          '</div><div style="text-align:center;padding-bottom:20px">' +
+          '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/entry\')">去录入成绩</button></div></div>';
       }
 
       /* 统计卡片 */
@@ -100,11 +103,17 @@
         });
         return h + "</div>";
       };
-      html += '<div class="chart-grid">' +
-        '<div style="grid-column:1/-1">' +
-        weakCard("⚠ 薄弱项目（全班）", weakAll.weaknesses, "weak") +
-        weakCard("✔ 优势项目（全班）", weakAll.strengths, "strong") +
-        "</div></div>";
+      let weakSection = weakCard("⚠ 薄弱项目（全班）", weakAll.weaknesses, "weak") +
+        weakCard("✔ 优势项目（全班）", weakAll.strengths, "strong");
+      if (!weakSection) {
+        weakSection = '<div class="card mb16"><div class="card-title">优势与薄弱项目</div>' +
+          '<div class="empty-tip" style="padding:10px 0">' +
+          (noCtx
+            ? "选择班级与测试批次后，这里会自动判定本班的薄弱项目（最低2项 / 及格率偏低 / 低于各项目均分）与优势项目，并给出训练建议。"
+            : "暂无足够数据判定（需要有完整成绩的学生）。") +
+          "</div></div>";
+      }
+      html += '<div class="chart-grid">' + '<div style="grid-column:1/-1">' + weakSection + "</div></div>";
 
       /* 各项目得分明细表：男女专属项目分开列示（9类） */
       html += '<div class="card"><div class="card-title">各项目得分明细</div><div class="table-wrap"><table class="tbl"><thead><tr>' +
@@ -139,8 +148,8 @@
           { name: "女生", values: defs.map(function (d) { return d.gender === "male" ? null : stats.items[d.key].female.avgScore; }), color: FCS.charts.COLORS.female },
         ], { title: "班级男女各项目得分雷达" });
 
-      /* 缓存图表PNG（等图表渲染完成后截图），供导出使用 */
-      FCS.analysisUI._cache = {
+      /* 缓存图表PNG（等图表渲染完成后截图），供导出使用；无班级/无成绩时不缓存（导出按钮已禁用） */
+      FCS.analysisUI._cache = (batch && hasComplete) ? {
         batch: batch,
         stats: stats,
         suggestions: suggestions,
@@ -152,7 +161,7 @@
         ]).then(function (arr) {
           return { pie: arr[0], bar: arr[1], hist: arr[2], radar: arr[3] };
         }),
-      };
+      } : null;
     },
   });
 

@@ -63,17 +63,23 @@
     const data = Object.keys(gradeDist).map(function (g) {
       return { name: g, value: gradeDist[g], itemStyle: { color: C.COLORS.grades[g] } };
     });
+    /* 无完整成绩时不画等分空环，改为提示文字（避免看起来像有数据） */
+    const hasData = data.some(function (d) { return d.value > 0; });
     chart.setOption({
       animation: false,
       textStyle: { fontFamily: FONT },
       title: { text: "等级分布", left: "center", top: 0, textStyle: { fontSize: 14, color: "#1f3a57" } },
       tooltip: { trigger: "item", formatter: "{b}：{c} 人（{d}%）" },
       legend: { bottom: 0, left: "center" },
-      series: [{
+      series: hasData ? [{
         type: "pie", radius: ["42%", "66%"], center: ["50%", "52%"],
         label: { formatter: "{b}\n{c}人" },
         data: data,
-      }],
+      }] : [],
+      graphic: hasData ? undefined : {
+        type: "text", left: "center", top: "middle",
+        style: { text: "暂无完整录入的学生成绩", fill: "#8aa5c2", fontSize: 14 },
+      },
     });
     return chart;
   };
@@ -197,6 +203,9 @@
   C.renderRadar = function (dom, indicators, seriesList, opts) {
     opts = opts || {};
     const chart = C.create(dom);
+    const allEmpty = seriesList.every(function (s) {
+      return !s.values || s.values.every(function (v) { return v === null || v === undefined; });
+    });
     chart.setOption({
       animation: false,
       textStyle: { fontFamily: FONT },
@@ -210,7 +219,7 @@
       },
       series: [{
         type: "radar",
-        data: seriesList.map(function (s) {
+        data: allEmpty ? [] : seriesList.map(function (s) {
           return {
             name: s.name,
             value: s.values,
@@ -220,6 +229,10 @@
           };
         }),
       }],
+      graphic: allEmpty ? {
+        type: "text", left: "center", top: "middle",
+        style: { text: "暂无完整录入的学生成绩", fill: "#8aa5c2", fontSize: 14 },
+      } : undefined,
     });
     return chart;
   };

@@ -7,6 +7,25 @@
 
   const state = { weeks: 4, focus: {}, generated: false };
 
+  /* 四个课段图标（正式计划与空状态骨架共用） */
+  const ICON_WARMUP = '<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 2.5c.8 2.8-1.5 4.2-1.5 6.6A4.6 4.6 0 0015 13.7c1.4 1.3 2 2.8 2 4.6a5 5 0 11-10 0c0-1.6.6-3.1 1.6-4.3-.4 1.3.4 2 1.2 1.8.6-.2.8-1.2.8-2.3 0-3 1.4-5.5 2.4-11z\"/></svg>';
+  const ICON_MAIN = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linecap=\"round\"><path d=\"M6.5 6.5v11M3.5 9.5v5M17.5 6.5v11M20.5 9.5v5M6.5 12h11\"/></svg>';
+  const ICON_COOL = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linejoin=\"round\"><path d=\"M12 19.5s-6.8-4.2-6.8-9.2A3.8 3.8 0 0112 7.6a3.8 3.8 0 016.8 2.7c0 5-6.8 9.2-6.8 9.2z\"/></svg>';
+  const ICON_HW = '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linejoin=\"round\"><path d=\"M4 20h3.8L19 8.8a2 2 0 00-2.8-2.8L4.8 17.4V20z\"/><path d=\"M13.8 6.4l3.8 3.8\"/></svg>';
+
+  /* 未选班级/批次时的周卡骨架：让首次使用者看到计划长什么样 */
+  function skeletonWeek() {
+    const block = function (icon, label) {
+      return '<div class="lesson-block"><div class="lesson-label">' + icon + label + '</div><ul><li class="text-3">—</li></ul></div>';
+    };
+    return '<div class="week-card"><div class="week-title">第 1 周　（生成后显示每周训练主题）</div><div class="week-body">' +
+      block(ICON_WARMUP, "热身（10分钟）") +
+      block(ICON_MAIN, "主体训练（25分钟）") +
+      block(ICON_COOL, "放松整理（5分钟）") +
+      block(ICON_HW, "课后作业") +
+      "</div></div>";
+  }
+
   FCS.trainingUI = FCS.trainingUI || {};
   FCS.trainingUI.setWeeks = function (v) { state.weeks = parseInt(v, 10) || 4; FCS.app.render(); };
   FCS.trainingUI.toggleFocus = function (key) {
@@ -73,14 +92,16 @@
       const UC = FCS.uiCommon;
       const esc = U.esc;
       const batch = FCS.app.getBatch();
-      if (!batch) {
-        el.innerHTML = UC.needContext("请先在顶栏选择班级和测试批次。");
-        return;
-      }
-      const stats = FCS.analysis.batchStats(batch);
-      const plan = data().plans[batch.id];
+      /* 未选班级/批次时也渲染完整板块（计划设置 + 周卡骨架），便于首次使用就看到本页结构 */
+      const noCtx = !batch;
+      const useBatch = batch || { id: "__empty", name: "未选择批次", testDate: "", students: [] };
+      const stats = FCS.analysis.batchStats(useBatch);
+      const plan = batch ? data().plans[batch.id] : null;
 
-      let html = UC.viewHead("训练计划", "根据班级薄弱项目生成 · 每周1次体育课 · 默认4周（一个月后复测）");
+      let html = UC.viewHead("训练计划",
+        noCtx
+          ? "未选择班级与测试批次 · 请先在顶栏选择（以下是本页各板块）"
+          : "根据班级薄弱项目生成 · 每周1次体育课 · 默认4周（一个月后复测）");
       html += '<div class="card mb16">' +
         '<div class="card-title">计划设置</div>' +
         '<div class="flex items-center gap16 flex-wrap">' +
@@ -88,8 +109,8 @@
         '<select class="input" onchange="FCS.trainingUI.setWeeks(this.value)">' +
         [2, 3, 4, 5, 6].map(function (w) { return '<option value="' + w + '"' + (state.weeks === w ? " selected" : "") + ">" + w + " 周</option>"; }).join("") +
         "</select></div>" +
-        '<button class="btn" onclick="FCS.trainingUI.autoFocus()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"2.6\" fill=\"currentColor\" stroke=\"none\"/></svg>按薄弱项自动选择</button>' +
-        '<button class="btn btn-primary" onclick="FCS.trainingUI.generate()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.3\" stroke-linecap=\"round\"><path d=\"M4 7h6.5\"/><circle cx=\"13.5\" cy=\"7\" r=\"2.4\"/><path d=\"M16.5 7H20\"/><path d=\"M4 17h1.5\"/><circle cx=\"8.5\" cy=\"17\" r=\"2.4\"/><path d=\"M11.5 17H20\"/></svg>生成训练计划</button>' +
+        '<button class="btn" ' + (noCtx ? "disabled " : "") + 'onclick="FCS.trainingUI.autoFocus()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"2.6\" fill=\"currentColor\" stroke=\"none\"/></svg>按薄弱项自动选择</button>' +
+        '<button class="btn btn-primary" ' + (noCtx ? "disabled " : "") + 'onclick="FCS.trainingUI.generate()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.3\" stroke-linecap=\"round\"><path d=\"M4 7h6.5\"/><circle cx=\"13.5\" cy=\"7\" r=\"2.4\"/><path d=\"M16.5 7H20\"/><path d=\"M4 17h1.5\"/><circle cx=\"8.5\" cy=\"17\" r=\"2.4\"/><path d=\"M11.5 17H20\"/></svg>生成训练计划</button>' +
         (plan ? '<button class="btn btn-success" onclick="FCS.trainingUI.exportPlan()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M6 2.5h9l5 5V21.5H6z\"/><path d=\"M14 2.5v5h5\"/></svg>导出PDF</button>' : "") +
         "</div>" +
         '<div class="text-sm text-2 mt8">重点训练项目（自动选择或点击切换）：</div>' +
@@ -101,8 +122,18 @@
         "</div></div>";
 
       if (!plan) {
-        html += '<div class="card"><div class="empty-tip">点击「按薄弱项自动选择」再「生成训练计划」，即可得到针对本班的训练方案。<br>' +
-          "当前班级薄弱项：<b>" + (FCS.analysis.weakItems(stats, { gender: "all" }).weaknesses.map(function (w) { return w.label; }).join("、") || "无") + "</b></div></div>";
+        if (noCtx) {
+          html += '<div class="card mb16"><div class="empty-tip">' +
+            "尚未选择班级与测试批次：请先在顶栏选择，再点「按薄弱项自动选择」和「生成训练计划」，即可得到针对本班的训练方案。<br>下面是生成后的计划长什么样（以第 1 周为例）。" +
+            '</div><div style="text-align:center;padding-bottom:20px">' +
+            '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">去班级管理</button></div></div>';
+          html += '<div class="card mb16"><div class="card-title">计划概览</div>' +
+            '<div class="text-sm text-2">生成时间：—　·　共 ' + state.weeks + " 周　·　每周1次体育课</div></div>";
+          html += skeletonWeek();
+        } else {
+          html += '<div class="card"><div class="empty-tip">点击「按薄弱项自动选择」再「生成训练计划」，即可得到针对本班的训练方案。<br>' +
+            "当前班级薄弱项：<b>" + (FCS.analysis.weakItems(stats, { gender: "all" }).weaknesses.map(function (w) { return w.label; }).join("、") || "无") + "</b></div></div>";
+        }
         el.innerHTML = html;
         return;
       }
@@ -113,11 +144,11 @@
       plan.planWeeks.forEach(function (wk) {
         html += '<div class="week-card"><div class="week-title">第 ' + wk.week + " 周　" + esc(wk.theme) + "</div><div class='week-body'>";
         /* 热身 */
-        html += '<div class="lesson-block"><div class="lesson-label"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 2.5c.8 2.8-1.5 4.2-1.5 6.6A4.6 4.6 0 0015 13.7c1.4 1.3 2 2.8 2 4.6a5 5 0 11-10 0c0-1.6.6-3.1 1.6-4.3-.4 1.3.4 2 1.2 1.8.6-.2.8-1.2.8-2.3 0-3 1.4-5.5 2.4-11z\"/></svg>热身（10分钟）</div><ul>';
+        html += '<div class="lesson-block"><div class="lesson-label">' + ICON_WARMUP + '热身（10分钟）</div><ul>';
         wk.warmup.forEach(function (w) { html += "<li>" + esc(w) + "</li>"; });
         html += "</ul></div>";
         /* 主体 */
-        html += '<div class="lesson-block"><div class="lesson-label"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linecap=\"round\"><path d=\"M6.5 6.5v11M3.5 9.5v5M17.5 6.5v11M20.5 9.5v5M6.5 12h11\"/></svg>主体训练（25分钟）</div>';
+        html += '<div class="lesson-block"><div class="lesson-label">' + ICON_MAIN + '主体训练（25分钟）</div>';
         wk.main.forEach(function (block) {
           if (block.genderLabel) html += '<div class="bold mt8 mb8">— ' + esc(block.genderLabel) + " —</div>";
           if (block.entries) {
@@ -135,11 +166,11 @@
         });
         html += "</div>";
         /* 放松 */
-        html += '<div class="lesson-block"><div class="lesson-label"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linejoin=\"round\"><path d=\"M12 19.5s-6.8-4.2-6.8-9.2A3.8 3.8 0 0112 7.6a3.8 3.8 0 016.8 2.7c0 5-6.8 9.2-6.8 9.2z\"/></svg>放松整理（5分钟）</div><ul>';
+        html += '<div class="lesson-block"><div class="lesson-label">' + ICON_COOL + '放松整理（5分钟）</div><ul>';
         wk.cooldown.forEach(function (w) { html += "<li>" + esc(w) + "</li>"; });
         html += "</ul></div>";
         /* 作业 */
-        html += '<div class="lesson-block"><div class="lesson-label"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.1\" stroke-linejoin=\"round\"><path d=\"M4 20h3.8L19 8.8a2 2 0 00-2.8-2.8L4.8 17.4V20z\"/><path d=\"M13.8 6.4l3.8 3.8\"/></svg>课后作业</div><ul>';
+        html += '<div class="lesson-block"><div class="lesson-label">' + ICON_HW + '课后作业</div><ul>';
         wk.homework.forEach(function (w) { html += "<li>" + esc(w) + "</li>"; });
         html += "</ul></div>";
         html += "</div></div>";
