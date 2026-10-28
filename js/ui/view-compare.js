@@ -13,6 +13,8 @@
 
   FCS.compareUI = FCS.compareUI || {};
   FCS.compareUI.setTab = function (t) { state.tab = t; FCS.app.render(); };
+  /* 纵向对比页内直接切换班级（本页顶栏是隐藏的，必须能就地换班） */
+  FCS.compareUI.setClass = function (id) { FCS.app.setClass(id || null); };
   FCS.compareUI.setBatchA = function (id) { state.batchA = id; FCS.app.render(); };
   FCS.compareUI.setBatchB = function (id) { state.batchB = id; FCS.app.render(); };
   FCS.compareUI.toggleClass = function (id) { state.classSel[id] = !state.classSel[id]; FCS.app.render(); };
@@ -189,16 +191,31 @@
 
     let html = "";
     if (noCtx) {
+      const classes = data().classes;
       html += '<div class="card mb16"><div class="empty-tip">' +
         "同一班级纵向对比：用同一班级的两次测试批次（如9月初测与10月复测）对比每名学生的进步与退步。<br>" +
-        (cls
-          ? "当前班级只有 " + batches.length + " 个测试批次，至少需要 2 个才能对比。"
-          : "尚未选择班级与测试批次：请先在顶栏选择。以下是本页各个板块。") +
+        (!classes.length
+          ? "还没有班级，请先到「班级管理」新建班级并录入成绩。"
+          : (cls
+            ? "当前班级只有 " + batches.length + " 个测试批次，至少需要 2 个才能对比。"
+            : "尚未选择班级：请在下方「对比班级」中选择要对比的班级。")) +
         '</div><div style="text-align:center;padding-bottom:20px">' +
         '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">' + (cls ? "去新建复测批次" : "去班级管理") + "</button></div></div>";
     }
 
+    /* 班级选择：本页顶栏隐藏，故在此处就地切换班级（切换后批次随班级联动） */
+    const allClasses = data().classes;
     html += '<div class="compare-pair-select">' +
+      '<div class="cp-item"><label class="field">对比班级</label>' +
+      (allClasses.length
+        ? '<select class="input" onchange="FCS.compareUI.setClass(this.value)">' +
+          '<option value="">— 请选择班级 —</option>' +
+          allClasses.map(function (c) {
+            return '<option value="' + c.id + '"' + (cls && c.id === cls.id ? " selected" : "") + ">" + esc(c.name + "（" + c.batches.length + " 个批次）") + "</option>";
+          }).join("") +
+          "</select>"
+        : '<select class="input" disabled><option>— 还没有班级 —</option></select>') +
+      "</div>" +
       '<div class="cp-item"><label class="field">对比批次一（上次）</label>' +
       (noCtx
         ? '<select class="input" disabled><option>— 未选择批次 —</option></select>'
