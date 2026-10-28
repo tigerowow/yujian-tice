@@ -201,7 +201,9 @@
 
   /* 成长曲线（折线）：该生总分随各次测试批次变化。
      categories: 批次名数组；seriesList: [{name, values(与categories对齐，缺项传null), color}]
-     单条线时自动画 及格60 / 良好80 / 优秀90 三条参考线 */
+     纵轴按数据动态缩放（留余量、对齐5的倍数、最小跨度20分），避免小变化被压成一条直线；
+     及格60 / 良好80 / 优秀90 参考线只画落在可视区间内的。
+     opts.fullRange: true 时强制 0~100（可选开关用） */
   C.renderTrendLine = function (dom, categories, seriesList, opts) {
     opts = opts || {};
     const chart = C.create(dom);
@@ -209,6 +211,40 @@
     const hasPoint = seriesList.some(function (s) {
       return (s.values || []).some(function (v) { return v !== null && v !== undefined; });
     });
+
+    /* ---- 纵轴范围：动态缩放 ---- */
+    const nums = [];
+    seriesList.forEach(function (s) {
+      (s.values || []).forEach(function (v) {
+        if (v !== null && v !== undefined && !isNaN(v)) nums.push(Number(v));
+      });
+    });
+    let yMin = 0, yMax = 100;
+    if (!opts.fullRange && nums.length) {
+      const lo = Math.min.apply(null, nums), hi = Math.max.apply(null, nums);
+      const pad = Math.max(3, (hi - lo) * 0.15);
+      let a = Math.floor((lo - pad) / 5) * 5;
+      let b = Math.ceil((hi + pad) / 5) * 5;
+      if (b - a < 20) { /* 最小跨度 20 分，避免两次成绩接近时被放大成剧烈波动 */
+        const mid = (a + b) / 2;
+        a = Math.max(0, Math.floor((mid - 10) / 5) * 5);
+        b = Math.min(100, a + 20);
+        if (b - a < 20) a = Math.max(0, b - 20);
+      }
+      yMin = Math.max(0, a);
+      yMax = Math.min(100, b);
+    }
+    const span = yMax - yMin;
+    const yInterval = span <= 25 ? 5 : span <= 60 ? 10 : 20;
+
+    /* 参考线只保留落在可视区间内的 */
+    const refs = [
+      { yAxis: 60, name: "及格 60", color: "#fab219" },
+      { yAxis: 80, name: "良好 80", color: "#2a78d6" },
+      { yAxis: 90, name: "优秀 90", color: "#0ca30c" },
+    ].filter(function (r) { return r.yAxis > yMin && r.yAxis < yMax; })
+      .map(function (r) { return { yAxis: r.yAxis, name: r.name, lineStyle: { color: r.color } }; });
+
     const option = {
       animation: false,
       textStyle: { fontFamily: FONT },
@@ -221,7 +257,10 @@
       grid: single ? { left: 8, right: 70, top: 40, bottom: 8, containLabel: true } : GRID_WITH_LEGEND,
       /* boundaryGap:true → 数据点落在分类带中央，首尾标签不会被裁掉，也不与参考线标签重叠 */
       xAxis: { type: "category", data: categories, boundaryGap: true, axisLabel: { fontSize: 12 } },
-      yAxis: { type: "value", min: 0, max: 100, name: "总分", nameGap: 10, axisLabel: { fontSize: 12 }, minInterval: 10 },
+      yAxis: {
+        type: "value", min: yMin, max: yMax, interval: yInterval,
+        name: "总分", nameGap: 10, axisLabel: { fontSize: 12 },
+      },
       series: hasPoint ? seriesList.map(function (s) {
         return {
           name: s.name,
@@ -237,15 +276,11 @@
             show: true, position: "top", fontSize: 12, fontWeight: "bold",
             formatter: function (p) { return p.value === null || p.value === undefined ? "" : p.value; },
           },
-          markLine: single ? {
+          markLine: single && refs.length ? {
             silent: true, symbol: "none",
             label: { formatter: "{b}", fontSize: 11, position: "insideEndTop", color: "#8aa5c2" },
             lineStyle: { type: "dashed", width: 1, color: "#c9ddef" },
-            data: [
-              { yAxis: 60, name: "及格 60", lineStyle: { color: "#fab219" } },
-              { yAxis: 80, name: "良好 80", lineStyle: { color: "#2a78d6" } },
-              { yAxis: 90, name: "优秀 90", lineStyle: { color: "#0ca30c" } },
-            ],
+            data: refs,
           } : undefined,
         };
       }) : [],
