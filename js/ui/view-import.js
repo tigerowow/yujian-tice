@@ -211,7 +211,7 @@
       let batchOpts = '<option value="">— 请选择测试批次 —</option>';
       if (defCls) {
         defCls.batches.forEach(function (b) {
-          batchOpts += '<option value="' + b.id + '"' + (b.id === defBatchId ? " selected" : "") + ">" + U.esc(b.name + "（" + b.testDate + "）") + "</option>";
+          batchOpts += '<option value="' + b.id + '"' + (b.id === defBatchId ? " selected" : "") + ">" + U.esc(FCS.uiCommon.batchLabel(b)) + "</option>";
         });
       }
       batchOpts += '<option value="__new__"' + (defBatchId ? "" : " selected") + ">＋ 新建批次</option>";
@@ -367,7 +367,7 @@
       let h = '<option value="">— 请选择测试批次 —</option>';
       if (cls) {
         cls.batches.forEach(function (b) {
-          h += '<option value="' + b.id + '">' + U.esc(b.name + "（" + b.testDate + "）") + "</option>";
+          h += '<option value="' + b.id + '">' + U.esc(FCS.uiCommon.batchLabel(b)) + "</option>";
         });
       }
       h += '<option value="__new__">＋ 新建批次</option>';

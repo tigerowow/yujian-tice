@@ -58,7 +58,7 @@
 
       let html = UC.viewHead("班级分析",
         noCtx ? "未选择班级与测试批次 · 请先在顶栏选择（以下是本页各板块）"
-              : esc((cls ? cls.name : "") + "  ·  " + useBatch.name + "  ·  " + useBatch.testDate),
+              : esc((cls ? cls.name : "") + "  ·  " + UC.batchLabel(useBatch)),
         '<button class="btn btn-primary" onclick="FCS.analysisUI.exportReport()" ' + (!hasComplete ? "disabled" : "") + "><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linejoin=\"round\"><path d=\"M6 2.5h9l5 5V21.5H6z\"/><path d=\"M14 2.5v5h5\"/></svg>导出PDF报告</button>" +
         '<button class="btn" onclick="FCS.app.navigate(\'#/training\')"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><circle cx=\"12\" cy=\"9\" r=\"5.2\"/><path d=\"M8.4 13.6L6.8 21l5.2-2.8L17.2 21l-1.6-7.4z\"/></svg>生成训练计划</button>');
 

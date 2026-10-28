@@ -95,7 +95,7 @@
             '<div class="st-batch-chips">' + history.map(function (h) {
               const isCur = h.batch.id === batch.id;
               const sc = h.computed.complete ? h.computed.total + " 分" : "缺项";
-              return '<div class="focus-chip' + (isCur ? " on" : "") + '" title="' + esc(h.batch.name + "（" + h.batch.testDate + "）") + '"' +
+              return '<div class="focus-chip' + (isCur ? " on" : "") + '" title="' + esc(UC.batchLabel(h.batch)) + '"' +
                 ' onclick="FCS.app.navigate(\'#/student/' + h.student.id + '\')">' +
                 esc(h.batch.name) + '<span class="fc-score">' + esc(sc) + "</span></div>";
             }).join("") + "</div>"

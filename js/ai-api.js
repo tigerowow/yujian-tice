@@ -102,6 +102,7 @@
       }
     });
     /* 问题中提到某个学生 → 附带该生的详细数据（全名单搜索，1480人也找得到） */
+    const tailStart = lines.length; /* 从这里开始是"点名学生 + 用户问题"，组合时必保留 */
     let foundS = null;
     try { foundS = FCS.aiBrain.findStudent(q); } catch (e) { foundS = null; }
     if (foundS) {
@@ -150,8 +151,21 @@
       }
     }
     lines.push("【用户问题】" + q);
-    const text = lines.join("\n");
-    return text.length > 3000 ? text.slice(0, 3000) : text;
+    /* 组合：身份 + 各班级概要（超长时可截断）+ 点名学生与用户问题（必保留）
+       班级多时若整体截断，会把问题里点名学生的数据和问题本身切掉，所以只压缩中间部分 */
+    const head = lines[0];
+    const body = lines.slice(1, tailStart);
+    const tailText = lines.slice(tailStart).join("\n");
+    const LIMIT = 5000;
+    const budget = LIMIT - head.length - tailText.length - 3;
+    const kept = [];
+    let used = 0;
+    for (let i = 0; i < body.length; i++) {
+      if (used + body[i].length + 1 > budget) { kept.push("（其余班级数据已省略）"); break; }
+      kept.push(body[i]);
+      used += body[i].length + 1;
+    }
+    return [head].concat(kept, [tailText]).join("\n");
   };
 
   function apiFetch(url, opts) {

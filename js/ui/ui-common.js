@@ -39,6 +39,17 @@
     return UC.empty(msg, '<button class="btn btn-primary" onclick="FCS.app.navigate(\'#/classes\')">去班级管理</button>');
   };
 
+  /* 批次显示名：批次名本身已含该日期时（如"2026年9月7日"）不再重复附加 testDate */
+  UC.batchLabel = function (b) {
+    const name = String((b && b.name) || "");
+    const d = String((b && b.testDate) || "");
+    if (!d) return name;
+    const p = d.split("-");
+    const cn = p.length === 3 ? Number(p[0]) + "年" + Number(p[1]) + "月" + Number(p[2]) + "日" : "";
+    if (name.indexOf(d) >= 0 || (cn && name.indexOf(cn) >= 0)) return name;
+    return name + "（" + d + "）";
+  };
+
   /* 简单分页器：opts {page, pageSize, total, onChange} */
   UC.pager = function (opts) {
     const totalPages = Math.max(1, Math.ceil(opts.total / opts.pageSize));

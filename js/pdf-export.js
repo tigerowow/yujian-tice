@@ -374,9 +374,9 @@
 
   /* 导出带进度提示 */
   P.toastResult = function (promise, what) {
-    FCS.util.toast("⏳ 正在生成" + what + "，请稍候…", "info");
+    FCS.util.toast("正在生成" + what + "，请稍候…", "info");
     promise.then(function (r) {
-      FCS.util.toast("📄 " + what + "已生成并开始下载（共 " + r.pages + " 页）", "success");
+      FCS.util.toast(what + "已生成并开始下载（共 " + r.pages + " 页）", "success");
     }).catch(function (e) {
       console.error(e);
       FCS.util.toast(what + "生成失败：" + e.message, "error");

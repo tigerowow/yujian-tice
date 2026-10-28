@@ -7,16 +7,19 @@
 
   AI.messages = [];   /* {role:'user'|'ai'|'typing', html, tag} */
 
-  /* AI问答模式开关：状态记住（localStorage），打开后所有问题走扣子智能体 */
+  /* AI问答模式开关：状态记住（localStorage）
+     首次打开（从未手动切换过）时：已配置Coze → 默认开启联网问答；未配置 → 默认关闭，本地大脑照常可用 */
   try {
-    AI.aiModeOn = localStorage.getItem("fcs_ai_mode") === "1";
+    const saved = localStorage.getItem("fcs_ai_mode");
+    AI.aiModeOn = saved === null ? FCS.aiAPI.isConfigured() : saved === "1";
   } catch (e) { AI.aiModeOn = false; }
 
   AI.ensureWelcome = function () {
     if (!AI.messages.length) {
       AI.messages.push({
         role: "ai", tag: null,
-        html: "你好，我是AI教练，可以回答各班级和学生数据的各种问题。<br>例如：这个班哪些项目最薄弱？某位同学复测进步了吗？引体向上9个多少分？",
+        html: "你好，我是育健AI教练，既会分析本班的体测数据，也能解答运动训练、营养补充、伤病预防与急救等专业问题。" +
+          "<br>例如：这个班哪些项目最薄弱？跑完1000米恶心怎么办？体测前三天怎么吃？",
       });
     }
   };
@@ -92,8 +95,8 @@
     const inp = document.getElementById("ai-input");
     if (inp) {
       inp.placeholder = AI.aiModeOn
-        ? "AI问答已开启：所有问题由育健AI教练回答"
-        : "问我关于各班级和学生数据的问题，按回车发送";
+        ? "AI问答已开启：体测数据、运动训练、营养、急救等问题都可以问"
+        : "本地问答：目前可回答班级、学生与计分相关问题（打开AI问答可问更多）";
     }
   };
 
@@ -182,11 +185,11 @@
       AI.ensureWelcome();
 
       const chips = [
-        "这个班哪些项目最薄弱？",
-        "全班平均分和及格率怎么样？",
-        "男生和女生谁的平均分高？",
-        "引体向上9个多少分？",
-        "怎么导入成绩？",
+        "跑完1000米恶心想吐，怎么处理和预防？",
+        "体测当天早餐吃什么最好？",
+        "运动后30分钟补什么恢复最快？",
+        "体育课上学生中暑晕倒，正确急救步骤是什么？",
+        "学生长期熬夜对体测成绩影响有多大？",
       ];
       let dynamicChip = "";
       const defCls = FCS.aiBrain.defaultClass();
@@ -195,19 +198,19 @@
         dynamicChip = '<div class="ai-chip" data-q="' + esc(dq) + '" onclick="FCS.aiUI.fillInput(this.getAttribute(\'data-q\'))">' + esc(dq) + "</div>";
       }
 
-      let html = UC.viewHead("AI教练", "直接提问，可查询全部班级和批次的数据");
+      let html = UC.viewHead("AI教练", "查体测数据，也答运动训练、营养与急救问题");
       html += '<div class="ai-layout">' +
         '<div class="ai-chat">' +
         '<div class="ai-messages" id="ai-messages"></div>' +
         '<div class="ai-input-row">' +
-        '<input id="ai-input" class="input" placeholder="问我关于各班级和学生数据的问题，按回车发送" onkeydown="if(event.key===\'Enter\')FCS.aiUI.send()">' +
+        '<input id="ai-input" class="input" placeholder="问我关于体测数据、运动训练、营养、急救等问题，按回车发送" onkeydown="if(event.key===\'Enter\')FCS.aiUI.send()">' +
         '<div class="ai-switch-wrap" id="ai-switch" onclick="FCS.aiUI.toggleAI()"><span class="ai-switch-label">AI问答</span><span class="ai-switch"><span class="ai-switch-knob"></span></span></div>' +
         '<button class="btn btn-primary" onclick="FCS.aiUI.send()">发送</button>' +
         '<button class="btn" onclick="FCS.aiUI.clear()">清空</button>' +
         "</div></div>" +
         '<div class="ai-side">' +
         '<div class="ai-side-card"><div class="asc-title">我能做什么</div>' +
-        '<div class="ai-cap-list">· 查询计分规则（如“引体向上9个多少分”）<br>· 查看学生总分、等级与薄弱项<br>· 查看学生复测进步情况<br>· 分析班级优势与薄弱项目<br>· 查看平均分、及格率等班级指标</div></div>' +
+        '<div class="ai-cap-list">· 查询计分规则（如“引体向上9个多少分”）<br>· 查看学生总分、等级与薄弱项<br>· 查看学生复测进步情况<br>· 分析班级优势与薄弱项目<br>· 查看平均分、及格率等班级指标<br>· 解答训练安排、运动营养、急救处理等专业问题（需联网）</div></div>' +
         '<div class="ai-side-card"><div class="asc-title">试试这样问</div>' +
         chips.map(function (t) {
           return '<div class="ai-chip" data-q="' + esc(t) + '" onclick="FCS.aiUI.fillInput(this.getAttribute(\'data-q\'))">' + esc(t) + "</div>";

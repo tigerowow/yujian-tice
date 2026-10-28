@@ -55,7 +55,7 @@
     const body = document.createElement("div");
     let copyOptions = "";
     cls.batches.forEach(function (b) {
-      copyOptions += '<option value="' + b.id + '">' + U.esc(b.name + "（" + b.testDate + "）") + "</option>";
+      copyOptions += '<option value="' + b.id + '">' + U.esc(FCS.uiCommon.batchLabel(b)) + "</option>";
     });
     body.innerHTML =
       '<div style="display:flex;flex-direction:column;gap:12px;min-width:400px">' +

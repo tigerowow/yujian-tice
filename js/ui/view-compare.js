@@ -220,14 +220,14 @@
       (noCtx
         ? '<select class="input" disabled><option>— 未选择批次 —</option></select>'
         : '<select class="input" onchange="FCS.compareUI.setBatchA(this.value)">' +
-          batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchA ? " selected" : "") + ">" + esc(b.name + "（" + b.testDate + "）") + "</option>"; }).join("") +
+          batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchA ? " selected" : "") + ">" + esc(UC.batchLabel(b)) + "</option>"; }).join("") +
           "</select>") +
       "</div>" +
       '<div class="cp-item"><label class="field">对比批次二（本次）</label>' +
       (noCtx
         ? '<select class="input" disabled><option>— 未选择批次 —</option></select>'
         : '<select class="input" onchange="FCS.compareUI.setBatchB(this.value)">' +
-          batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchB ? " selected" : "") + ">" + esc(b.name + "（" + b.testDate + "）") + "</option>"; }).join("") +
+          batches.map(function (b) { return '<option value="' + b.id + '"' + (b.id === state.batchB ? " selected" : "") + ">" + esc(UC.batchLabel(b)) + "</option>"; }).join("") +
           "</select>") +
       "</div>" +
       '<div class="text-sm text-2">按学籍号自动匹配同一学生</div></div>';

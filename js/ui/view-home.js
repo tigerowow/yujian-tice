@@ -7,7 +7,6 @@
     title: "首页",
     render: function (el) {
       const data = FCS.app.data;
-      const U = FCS.util;
       const UC = FCS.uiCommon;
 
       /* 全校级汇总：遍历所有班级、所有批次、所有学生 */
@@ -36,12 +35,16 @@
           }).length;
         }, 0);
       }, 0);
-      const allPassRate = completeCount > 0 ? Math.round(allPassCount / completeCount * 10) / 10 : null;
-      const backupDays = FCS.storage.backupDays(data);
-      const backupTip = backupDays === null ? "从未备份" : U.dateTime(data.lastBackupAt) + "（" + backupDays + " 天前）";
+      /* 百分比保留1位小数：比例 ×1000 → 取整 → ÷10（此前误写 ×10，导致 95% 显示成 1%） */
+      const allPassRate = completeCount > 0 ? Math.round(allPassCount / completeCount * 1000) / 10 : null;
+
+      /* 欢迎语 + 下一步引导（引导随是否有数据变化，避免已有数据时还提示"先建班"） */
+      const welcome = "欢迎使用育健AI体测数据分析软件。" + (data.classes.length
+        ? '可以继续到「数据录入」录入成绩，或到「班级分析」查看统计与图表。'
+        : '第一次使用可以到「设置」点「加载示例数据」，或直接到「班级管理」新建班级。');
 
       el.innerHTML =
-        '<div class="home-summary">📊 当前有 <b>' + data.classes.length + '</b> 个班级、<b>' + totalBatches + '</b> 个测试批次、<b>' + allStudents + '</b> 条学生记录　·　上次备份：' + backupTip + '</div>' +
+        '<div class="home-summary">' + welcome + '</div>' +
         '<div class="stat-row">' +
         UC.statCard("班级数", data.classes.length, "") +
         UC.statCard("测试批次", totalBatches, "") +
