@@ -8,8 +8,22 @@
   /* 当前解析结果（供AI纠错后重新预览复用） */
   let currentResult = null, currentFile = null;
 
-  /* 把AI返回的修正建议构建成一条可导入的学生记录（复用本地 parseCell 校验） */
-  function buildRowFromCorrection(c) {
+  /* 性别专属项目列名（与 importer 的 GENDER_COLS 对应），用于从原始单元格回填 */
+  const MALE_ENDURANCE_COLS = ["1000米跑", "1000米", "1000m跑", "1000m"];
+  const FEMALE_ENDURANCE_COLS = ["800米跑", "800米", "800m跑", "800m"];
+  const MALE_STRENGTH_COLS = ["引体向上"];
+  const FEMALE_STRENGTH_COLS = ["仰卧起坐", "一分钟仰卧起坐"];
+
+  function cellValue(cells, colNames) {
+    for (let i = 0; i < (cells || []).length; i++) {
+      if (colNames.indexOf(cells[i].col) >= 0) return cells[i].val;
+    }
+    return null;
+  }
+
+  /* 把AI返回的修正建议构建成一条可导入的学生记录（复用本地 parseCell 校验）
+     cells：该行原始单元格，性别确定后用它回填耐力/力量（性别不明时AI给不出这两个值） */
+  function buildRowFromCorrection(c, cells) {
     const studentNo = String(c.studentNo == null ? "" : c.studentNo).trim().replace(/\.0+$/, "");
     const name = String(c.name == null ? "" : c.name).trim();
     let gender = null;
@@ -28,6 +42,23 @@
       if (!parsed.ok) fieldErrors.push(parsed.error);
       else raw.endurance = parsed.value;
     }
+    /* 性别确定后，耐力/力量若AI未给出，回填原始单元格里对应性别的项目 */
+    if (gender) {
+      if (raw.endurance === undefined) {
+        const ev = cellValue(cells, gender === "male" ? MALE_ENDURANCE_COLS : FEMALE_ENDURANCE_COLS);
+        if (ev !== null && ev !== undefined && ev !== "") {
+          const parsed = FCS.importer.parseCell("endurance", ev);
+          if (parsed.ok && parsed.value !== null && parsed.value !== undefined) raw.endurance = parsed.value;
+        }
+      }
+      if (raw.strength === undefined) {
+        const sv = cellValue(cells, gender === "male" ? MALE_STRENGTH_COLS : FEMALE_STRENGTH_COLS);
+        if (sv !== null && sv !== undefined && sv !== "") {
+          const parsed = FCS.importer.parseCell("strength", sv);
+          if (parsed.ok && parsed.value !== null && parsed.value !== undefined) raw.strength = parsed.value;
+        }
+      }
+    }
     if (!studentNo) fieldErrors.push("缺少学籍号");
     if (!name) fieldErrors.push("缺少姓名");
     if (!gender) fieldErrors.push("性别无法识别");
@@ -45,7 +76,7 @@
       const c = byRow[item.error.rowNum];
       if (!c) return;
       const sr = result.sheetRows[item.sheetIdx];
-      const r = buildRowFromCorrection(c);
+      const r = buildRowFromCorrection(c, item.error.cells);
       sr.errors = sr.errors.filter(function (e) { return e.rowNum !== item.error.rowNum; });
       if (r.ok) {
         const dup = sr.rows.some(function (x) { return x.studentNo === r.row.studentNo; });
@@ -264,34 +295,67 @@
       });
     },
 
-    /* 展示AI修正建议（逐行勾选确认） */
+    /* 展示AI修正建议（逐行勾选确认；姓名/学籍号/性别可直接编辑补充） */
     showCorrections: function (errList, corrections) {
       const U = FCS.util;
       const esc = U.esc;
       const body = document.createElement("div");
-      let html = '<div class="text-sm text-2 mb8">AI 给出 <b>' + corrections.length + '</b> 条修正建议，勾选要应用的（默认全选）：</div>';
-      corrections.forEach(function (c) {
+      let html = '<div class="text-sm text-2 mb8">AI 给出 <b>' + corrections.length + '</b> 条修正建议。AI 无法确定的<b>姓名、学籍号、性别</b>，请直接在下方补充或修改（红框=需补充），其余项目已由 AI 修正：</div>';
+      corrections.forEach(function (c, idx) {
         const e = errList.find(function (x) { return x.error.rowNum === c.rowNum; });
         const originals = e ? (e.error.cells || []).map(function (cc) { return cc.col + "=" + cc.val; }).join("，") : "";
-        html += '<label class="flex items-start gap8 mb8" style="font-size:13px;line-height:1.6">' +
-          '<input type="checkbox" class="ai-fix" data-row="' + c.rowNum + '" checked>' +
-          '<span>第 <b>' + c.rowNum + '</b> 行' + (e ? ' ' + esc(e.error.name) : '') + '：<br>' +
-          '<span class="text-2">原始：' + esc(originals || "（无原始值）") + '</span><br>' +
-          '<span class="text-success">修正：' + esc(c.note || "已按规范格式修正") + '</span></span></label>';
+        const genderMale = c.gender === "男" || c.gender === "male";
+        const genderFemale = c.gender === "女" || c.gender === "female";
+        const needName = !c.name || String(c.name).trim() === "";
+        const needNo = !c.studentNo || String(c.studentNo).trim() === "";
+        const needGender = !genderMale && !genderFemale;
+        html += '<div class="ai-fix-card">' +
+          '<label class="flex items-center gap8 ai-fix-head">' +
+          '<input type="checkbox" class="ai-fix" data-idx="' + idx + '" checked>' +
+          '第 <b>' + c.rowNum + '</b> 行' + (e ? ' <span class="text-2">' + esc(e.error.name || "") + '</span>' : '') +
+          '</label>' +
+          '<div class="ai-fix-fields">' +
+          '<label class="field">姓名<input class="input ai-name" data-idx="' + idx + '" value="' + esc(c.name || "") + '" placeholder="请补充姓名"' + (needName ? ' style="border-color:var(--danger)"' : "") + '></label>' +
+          '<label class="field">学籍号<input class="input ai-no" data-idx="' + idx + '" value="' + esc(c.studentNo || "") + '" placeholder="请补充学籍号"' + (needNo ? ' style="border-color:var(--danger)"' : "") + '></label>' +
+          '<label class="field">性别<select class="input ai-gender" data-idx="' + idx + '"' + (needGender ? ' style="border-color:var(--danger)"' : "") + '>' +
+          '<option value=""' + (!genderMale && !genderFemale ? " selected" : "") + '>请选择</option>' +
+          '<option value="male"' + (genderMale ? " selected" : "") + '>男</option>' +
+          '<option value="female"' + (genderFemale ? " selected" : "") + '>女</option>' +
+          '</select></label>' +
+          '</div>' +
+          '<div class="text-sm text-2">原始：' + esc(originals || "（无原始值）") + '</div>' +
+          '<div class="text-sm text-success">AI修正：' + esc(c.note || "已按规范格式修正") + '</div>' +
+          '</div>';
       });
       body.innerHTML = html;
       U.showModal({
         title: "AI智能纠错结果",
         body: body,
-        width: "640px",
+        width: "660px",
         actions: [
           { text: "取消", onClick: function (api) { api.close(); FCS.importUI.renderPreview(); } },
           {
             text: "应用并重新预览", primary: true, onClick: function (api) {
               const checked = [];
-              body.querySelectorAll(".ai-fix").forEach(function (cb) { if (cb.checked) checked.push(parseInt(cb.getAttribute("data-row"), 10)); });
+              body.querySelectorAll(".ai-fix").forEach(function (cb) { if (cb.checked) checked.push(parseInt(cb.getAttribute("data-idx"), 10)); });
               api.close();
-              const accepted = corrections.filter(function (c) { return checked.indexOf(c.rowNum) >= 0; });
+              const accepted = [];
+              corrections.forEach(function (c, idx) {
+                if (checked.indexOf(idx) < 0) return;
+                const c2 = {
+                  rowNum: c.rowNum, studentNo: c.studentNo, name: c.name, gender: c.gender,
+                  height: c.height, weight: c.weight, vitalCapacity: c.vitalCapacity,
+                  run50: c.run50, standJump: c.standJump, sitReach: c.sitReach,
+                  endurance: c.endurance, strength: c.strength, note: c.note,
+                };
+                const nameEl = body.querySelector('.ai-name[data-idx="' + idx + '"]');
+                const noEl = body.querySelector('.ai-no[data-idx="' + idx + '"]');
+                const gEl = body.querySelector('.ai-gender[data-idx="' + idx + '"]');
+                if (nameEl) c2.name = nameEl.value.trim();
+                if (noEl) c2.studentNo = noEl.value.trim();
+                if (gEl) c2.gender = gEl.value;
+                accepted.push(c2);
+              });
               const r = applyCorrections(errList, accepted);
               U.toast("已应用 " + r.applied + " 条修正" + (r.failed ? "，仍有 " + r.failed + " 行未能修正" : ""), r.failed ? "warn" : "success");
               FCS.importUI.renderPreview();
