@@ -170,6 +170,16 @@
     return v !== null && v !== undefined && String(v).trim() !== "";
   }
 
+  /* 捕获一行的原始单元格内容（列名→原始文本），供AI纠错查看原始输入 */
+  function captureCells(headerRow, row) {
+    return (headerRow || []).map(function (h, i) {
+      const col = normHeader(h);
+      const v = row[i];
+      const val = (v === null || v === undefined) ? "" : String(v).trim();
+      return { col: col, val: val };
+    }).filter(function (c) { return c.col && c.val; });
+  }
+
   /* 解析模板文件 → {sheetRows:[{sheetName, genderMode, rows, errors}], warnings:[]}
      genderMode: 'genderCol'（性别列识别）| 'project'（按项目推断）| 'sheet'（按工作表名）| 'manual'（需手动） */
   IM.readTemplate = function (file) {
@@ -286,11 +296,11 @@
 
           const studentNo = noText.replace(/\.0+$/, "");
           if (rowErrors.length) {
-            errors.push({ rowNum: r + 1, studentNo: studentNo || "?", name: nameText || "?", errors: rowErrors });
+            errors.push({ rowNum: r + 1, studentNo: studentNo || "?", name: nameText || "?", errors: rowErrors, cells: captureCells(headerRow, row) });
             continue;
           }
           if (seenNos[studentNo]) {
-            errors.push({ rowNum: r + 1, studentNo: studentNo, name: nameText, errors: ["学籍号与第 " + seenNos[studentNo] + " 行重复"] });
+            errors.push({ rowNum: r + 1, studentNo: studentNo, name: nameText, errors: ["学籍号与第 " + seenNos[studentNo] + " 行重复"], cells: captureCells(headerRow, row) });
             continue;
           }
           seenNos[studentNo] = r + 1;
@@ -345,6 +355,9 @@
     FCS.storage.save(data);
     return { ok: true, added: added, updated: updated, skipped: skipped };
   };
+
+  /* 暴露给AI纠错复用：解析单个字段值（含单位/格式/范围校验） */
+  IM.parseCell = parseCell;
 
   FCS.importer = IM;
 })();

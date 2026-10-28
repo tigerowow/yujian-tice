@@ -9,46 +9,50 @@
       const data = FCS.app.data;
       const U = FCS.util;
       const UC = FCS.uiCommon;
-      const batch = FCS.app.getBatch();
-      const cls = FCS.app.getClass();
-      const esc = U.esc;
 
-      /* 备份提醒 */
-      const days = FCS.storage.backupDays(data);
-      let banner = "";
-      if (days === null) {
-        banner = '<div class="banner banner-warn">⚠ 你还没有导出过数据备份。数据保存在浏览器中，清理浏览器数据可能丢失！请尽快到「设置」页导出备份。</div>';
-      } else if (days >= 14) {
-        banner = '<div class="banner banner-warn">⚠ 距上次数据备份已 ' + days + ' 天，请到「设置」页导出最新备份，防止数据丢失。</div>';
-      } else {
-        banner = '<div class="banner banner-info">ℹ 上次数据备份：' + U.dateTime(data.lastBackupAt) + "。建议每次录入成绩后都备份一次。</div>";
-      }
-
-      /* 概览统计 */
-      let totalStudents = 0, totalBatches = 0;
-      data.classes.forEach(function (c) {
-        c.batches.forEach(function (b) { totalBatches++; totalStudents += b.students.length; });
+      /* 全校级汇总：遍历所有班级、所有批次、所有学生 */
+      let totalBatches = 0, allStudents = 0, completeCount = 0, excellentCount = 0, sumTotal = 0, maleCount = 0, femaleCount = 0;
+      data.classes.forEach(function (cls) {
+        cls.batches.forEach(function (b) {
+          totalBatches++;
+          b.students.forEach(function (s) {
+            allStudents++;
+            if (s.gender === "male") maleCount++; else femaleCount++;
+            const c = FCS.scoring.computeAll(s.gender, s.raw);
+            if (c.complete) {
+              completeCount++;
+              sumTotal += c.total;
+              if (c.grade === "优秀") excellentCount++;
+            }
+          });
+        });
       });
-
-      let batchStatsHtml = "";
-      if (batch) {
-        const stats = FCS.analysis.batchStats(batch);
-        batchStatsHtml = '<div class="stat-row">' +
-          UC.statCard("当前批次", esc(batch.name), esc(batch.testDate)) +
-          UC.statCard("人数", stats.total.count, "男 " + stats.male.count + " / 女 " + stats.female.count) +
-          UC.statCard("平均分", stats.total.avg !== null ? stats.total.avg + " 分" : "—", "完整录入 " + stats.total.completeCount + " 人") +
-          UC.statCard("及格率", stats.total.passRate !== null ? stats.total.passRate + "%" : "—", "优良率 " + (stats.total.goodRate !== null ? stats.total.goodRate + "%" : "—"), stats.total.passRate !== null && stats.total.passRate < 80 ? "danger" : "highlight") +
-          "</div>";
-      }
+      const allAvg = completeCount > 0 ? Math.round(sumTotal / completeCount * 10) / 10 : null;
+      const allPassCount = data.classes.reduce(function (acc, cls) {
+        return acc + cls.batches.reduce(function (x, b) {
+          return x + b.students.filter(function (s) {
+            const c = FCS.scoring.computeAll(s.gender, s.raw);
+            return c.complete && c.total >= 60;
+          }).length;
+        }, 0);
+      }, 0);
+      const allPassRate = completeCount > 0 ? Math.round(allPassCount / completeCount * 10) / 10 : null;
+      const backupDays = FCS.storage.backupDays(data);
+      const backupTip = backupDays === null ? "从未备份" : U.dateTime(data.lastBackupAt) + "（" + backupDays + " 天前）";
 
       el.innerHTML =
-        banner +
+        '<div class="home-summary">📊 当前有 <b>' + data.classes.length + '</b> 个班级、<b>' + totalBatches + '</b> 个测试批次、<b>' + allStudents + '</b> 条学生记录　·　上次备份：' + backupTip + '</div>' +
         '<div class="stat-row">' +
         UC.statCard("班级数", data.classes.length, "") +
         UC.statCard("测试批次", totalBatches, "") +
-        UC.statCard("学生记录", totalStudents, "全部批次合计") +
+        UC.statCard("学生记录", allStudents, "男 " + maleCount + " / 女 " + femaleCount) +
         "</div>" +
-        batchStatsHtml +
+        '<div class="stat-row">' +
+        UC.statCard("总平均分", allAvg !== null ? allAvg + " 分" : "—", "完整录入 " + completeCount + " 人") +
+        UC.statCard("总及格率", allPassRate !== null ? allPassRate + "%" : "—", "") +
+        UC.statCard("优秀人数", excellentCount, "占完整录入 " + (completeCount > 0 ? Math.round(excellentCount / completeCount * 100) + "%" : "—")) +
+        UC.statCard("男女比例", maleCount + " : " + femaleCount, maleCount + " 男 / " + femaleCount + " 女") +
+        "</div>" +
         '<div class="card mb16"><div class="card-title">快捷入口</div>' +
         '<div class="home-actions">' +
         '<div class="home-action" onclick="FCS.app.navigate(\'#/entry\')"><div class="ha-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="M7.5 10L12 14.5 16.5 10"/><path d="M4.5 19.5h15"/></svg></div><div class="ha-title">导入 / 录入成绩</div><div class="ha-desc">导入Excel或手动录入学生成绩</div></div>' +

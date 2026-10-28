@@ -218,6 +218,63 @@
     });
   };
 
+  /* 从AI回复文本中提取JSON数组（兼容代码块包裹、前后多余文字） */
+  function extractJSONArray(text) {
+    if (!text) return null;
+    try { const v = JSON.parse(text); if (Array.isArray(v)) return v; } catch (e) {}
+    const t = String(text).replace(/```json/gi, "").replace(/```/g, "");
+    const s = t.indexOf("["), e = t.lastIndexOf("]");
+    if (s >= 0 && e > s) { try { const v = JSON.parse(t.slice(s, e + 1)); if (Array.isArray(v)) return v; } catch (e2) {} }
+    return null;
+  }
+
+  /* AI智能纠错：把导入解析失败的错误行发给Coze，返回JSON修正建议 */
+  A.correctImportErrors = function (errorRows) {
+    const cfg = A.getConfig();
+    if (!A.isConfigured()) return Promise.resolve({ ok: false, error: "尚未配置Coze" });
+    const botId = A.parseBotId(cfg.botId);
+    const lines = [
+      "你是体测成绩数据纠错助手。请纠正下面Excel导入时解析失败的数据行，只返回JSON。",
+      "各项目正确格式/单位/范围：身高=厘米(80~300，填\"1.75米\"应理解为175)；体重=公斤(20~300)；肺活量=毫升(100~10000)；50米跑=秒(5~20)；立定跳远=厘米(50~350)；坐位体前屈=厘米(-30~50)；耐力跑=时间(格式如4'07或4:07或247秒，60~900秒，男1000米/女800米)；力量=个(0~200，男引体向上/女仰卧起坐)；性别=男或女；学籍号与姓名为文本、不能为空。",
+    ];
+    errorRows.forEach(function (e) {
+      const cellStr = (e.cells || []).map(function (c) { return c.col + "=" + c.val; }).join("，");
+      lines.push("第" + e.rowNum + "行：学籍号=" + (e.studentNo || "") + "，姓名=" + (e.name || "") + "；原始单元格【" + cellStr + "】；错误原因：" + (e.errors || []).join("；"));
+    });
+    lines.push('请只返回一个JSON数组（不要任何其他文字或代码块标记），每个元素格式：{"rowNum":行号,"studentNo":"...","name":"...","gender":"男"或"女","height":数值,"weight":数值,"vitalCapacity":数值,"run50":数值,"standJump":数值,"sitReach":数值,"endurance":"4\'07格式的时间字符串","strength":数值,"note":"一句话说明修正了什么"}。只修正有错误或缺失的字段，其余字段保持原值；无法确定的字段填null、不要瞎猜；缺失且无法恢复的学籍号/姓名填null。');
+    const content = lines.join("\n");
+    let chatId = null, convId = null;
+    return apiFetch(API_BASE + "/v3/chat", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + cfg.token, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bot_id: botId, user_id: A.userId(), stream: false, auto_save_history: true,
+        additional_messages: [{ role: "user", content: content, content_type: "text" }],
+      }),
+    }).then(function (res) {
+      if (!res || res.code !== 0) return Promise.reject({ friendly: A.friendlyError(res && res.code, res && res.msg), code: res && res.code, msg: res && res.msg });
+      chatId = res.data.id; convId = res.data.conversation_id;
+      return A.pollRetrieve(chatId, convId, cfg.token, 0);
+    }).then(function () {
+      return apiFetch(API_BASE + "/v3/chat/message/list?conversation_id=" + encodeURIComponent(convId) + "&chat_id=" + encodeURIComponent(chatId), { headers: { "Authorization": "Bearer " + cfg.token } });
+    }).then(function (res) {
+      if (!res || res.code !== 0) return Promise.reject({ friendly: A.friendlyError(res && res.code, res && res.msg), code: res && res.code, msg: res && res.msg });
+      const list = res.data || [];
+      let answer = "";
+      for (let i = list.length - 1; i >= 0; i--) {
+        const m = list[i];
+        if (m.role === "assistant" && m.type === "answer" && m.content) { answer = String(m.content); break; }
+      }
+      if (!answer.trim()) return Promise.reject({ friendly: "AI没有返回纠错内容，请重试" });
+      const arr = extractJSONArray(answer);
+      if (!arr) return Promise.reject({ friendly: "AI返回的纠错结果无法解析，请重试" });
+      return { ok: true, corrections: arr };
+    }).catch(function (e) {
+      if (e && e.friendly) return { ok: false, error: e.friendly, code: e.code, msg: e.msg };
+      return { ok: false, error: "联网纠错失败，请检查网络后重试" };
+    });
+  };
+
   /* ---- 设置页表单 ---- */
   A.fillForm = function () {
     const cfg = A.getConfig();

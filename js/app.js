@@ -94,7 +94,7 @@
     /* 顶栏：班级管理/对比分析/设置页面用不到班级与批次选择器，隐藏顶栏 */
     const topbar = document.getElementById("topbar");
     if (topbar) {
-      topbar.style.display = (viewId === "classes" || viewId === "compare" || viewId === "settings" || viewId === "ai") ? "none" : "flex";
+      topbar.style.display = (viewId === "classes" || viewId === "compare" || viewId === "settings" || viewId === "ai" || viewId === "home") ? "none" : "flex";
     }
     /* 侧边栏高亮 */
     document.querySelectorAll(".side-nav a").forEach(function (a) {

@@ -201,6 +201,7 @@
 
       let html = UC.viewHead("数据录入", esc(batch.name + "  ·  " + batch.testDate),
         '<button class="btn btn-primary btn-lg" onclick="FCS.importUI.open()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4v10.5\"/><path d=\"M7.5 10L12 14.5 16.5 10\"/><path d=\"M4.5 19.5h15\"/></svg>导入Excel</button>' +
+        '<button class="btn btn-lg" onclick="FCS.importUI.openAI()"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5zM8.3 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM13.7 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM19.1 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6z"/></svg>AI智能导入</button>' +
         '<button class="btn" onclick="FCS.entryEdit.addStudent()">＋ 添加学生</button>');
       html += '<div class="entry-toolbar">' +
         '<input id="entry-search" class="input" placeholder="搜索姓名/学籍号" value="' + esc(state.keyword) + '" onchange="FCS.entryEdit.search()" style="width:180px">' +
