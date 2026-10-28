@@ -43,6 +43,29 @@
 .entry-toolbar .spacer { flex: 1; }
 .pager { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--text-2); }
 
+/* 录入页空状态：三个入口卡片 */
+.entry-launch { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+.entry-launch-card {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+}
+.entry-launch-card:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(42,120,214,.16); transform: translateY(-2px); }
+.entry-launch-card .elc-icon { color: var(--primary); line-height: 0; }
+.entry-launch-card .elc-icon svg { width: 42px; height: 42px; }
+.entry-launch-card .elc-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.entry-launch-card .elc-desc { font-size: 13px; color: var(--text-2); }
+
 /* 导入预览 */
 .preview-stats { display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap; }
 .preview-stats .ps-item { font-size: 14px; }

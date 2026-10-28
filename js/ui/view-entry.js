@@ -135,6 +135,39 @@
     const el = document.getElementById("inp-" + s.id + "-studentNo");
     if (el) { el.focus(); el.scrollIntoView({ block: "center" }); }
   };
+  /* 手动录入入口（未选班级/批次时）：快速新建班级+第一个测试批次后进入录入页 */
+  FCS.entryEdit.manualEntry = function () {
+    const U = FCS.util;
+    const body = document.createElement("div");
+    body.innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:12px;min-width:380px">' +
+      '<div><label class="field">班级名称（如：2024级体育教育1班）</label>' +
+      '<input id="me-cls-name" class="input" style="width:100%" placeholder="必填"></div>' +
+      '<div><label class="field">任课教师（可选）</label>' +
+      '<input id="me-cls-teacher" class="input" style="width:100%"></div>' +
+      '<div class="text-sm text-2">保存后将自动新建班级和第一个测试批次，并进入录入页填写学生</div>' +
+      "</div>";
+    U.showModal({
+      title: "手动录入 · 新建班级",
+      body: body,
+      actions: [
+        { text: "取消", onClick: function (api) { api.close(); } },
+        {
+          text: "创建并开始录入", primary: true, onClick: function (api) {
+            const name = document.getElementById("me-cls-name").value.trim();
+            if (!name) { U.toast("请填写班级名称", "warn"); return; }
+            const d = data();
+            const cls = FCS.storage.createClass(d, { name: name, teacher: document.getElementById("me-cls-teacher").value.trim() });
+            const b = FCS.storage.createBatch(d, cls.id, { name: "测试批次", testDate: U.today() });
+            api.close();
+            FCS.app.setClass(cls.id);
+            FCS.app.setBatch(b.id);
+            FCS.app.navigate("#/entry");
+          },
+        },
+      ],
+    });
+  };
   FCS.entryEdit.setPage = function (p) { state.page = p; FCS.app.render(); };
   FCS.entryEdit.search = function () {
     state.keyword = document.getElementById("entry-search").value.trim();
@@ -166,7 +199,21 @@
       const esc = U.esc;
       const batch = FCS.app.getBatch();
       if (!batch) {
-        el.innerHTML = UC.needContext("请先在顶栏选择班级和测试批次，或到「班级管理」新建。");
+        el.innerHTML = UC.viewHead("数据录入", "选择一种方式，开始录入学生成绩") +
+          '<div class="entry-launch">' +
+          '<div class="entry-launch-card" onclick="FCS.entryEdit.manualEntry()">' +
+          '<span class="elc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 000-3l-1-1a2.1 2.1 0 00-3 0L4 16z"/><path d="M13.5 6.5l3 3"/></svg></span>' +
+          '<span class="elc-title">手动录入</span>' +
+          '<span class="elc-desc">逐人填写成绩，自动算分</span></div>' +
+          '<div class="entry-launch-card" onclick="FCS.importUI.open()">' +
+          '<span class="elc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="M7.5 10L12 14.5 16.5 10"/><path d="M4.5 19.5h15"/></svg></span>' +
+          '<span class="elc-title">Excel导入</span>' +
+          '<span class="elc-desc">导入学校模板，自动识别男女</span></div>' +
+          '<div class="entry-launch-card" onclick="FCS.importUI.openAI()">' +
+          '<span class="elc-icon"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5zM8.3 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM13.7 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM19.1 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6z"/></svg></span>' +
+          '<span class="elc-title">AI智能导入</span>' +
+          '<span class="elc-desc">AI自动纠错，确认后导入</span></div>' +
+          "</div>";
         return;
       }
       const PAGE_SIZE = 50;
