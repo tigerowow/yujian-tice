@@ -11,6 +11,9 @@
     keyword: "",
     genderFilter: "all",
     onlyIncomplete: false,
+    /* 编辑模式：默认关闭（只读，姓名可点击查看个人报告）；点「手动编辑」开启，点「完成」退出 */
+    editing: false,
+    seenBatchId: null, /* 用于在切换到其他批次时自动回到只读 */
   };
 
   /* 解析并写入某个字段：返回是否成功 */
@@ -128,6 +131,7 @@
   FCS.entryEdit.addStudent = function () {
     const batch = FCS.app.getBatch();
     if (!batch) return;
+    state.editing = true; /* 新增学生必然需要编辑 */
     const s = FCS.storage.createStudent(batch, { studentNo: "", name: "", gender: "male" });
     FCS.storage.save(data());
     FCS.app.render();
@@ -135,6 +139,14 @@
     const el = document.getElementById("inp-" + s.id + "-studentNo");
     if (el) { el.focus(); el.scrollIntoView({ block: "center" }); }
   };
+  /* 「手动编辑 / 完成」：在只读浏览与表格编辑两种状态之间切换 */
+  FCS.entryEdit.toggleEdit = function () {
+    state.editing = !state.editing;
+    if (!state.editing) FCS.util.toast("已完成编辑并保存", "success");
+    FCS.app.render();
+  };
+  /* 回到只读状态（从班级管理点批次进入时调用） */
+  FCS.entryEdit.resetEdit = function () { state.editing = false; };
   /* 「继续录入」：清空当前班级/批次选择，回到录入方式选择（三个入口）界面 */
   FCS.entryEdit.continueEntry = function () {
     FCS.app.setClass(null); /* 会同时清空批次、写入 ui.lastClassId=null 并重绘 */
@@ -196,6 +208,11 @@
     return v === null || v === undefined ? "" : String(v);
   }
 
+  /* 只读模式的成绩单元格：空值显示灰色占位符 */
+  function roCell(text) {
+    return text ? FCS.util.esc(text) : '<span class="text-3">—</span>';
+  }
+
   FCS.app.registerView("entry", {
     title: "数据录入",
     render: function (el) {
@@ -222,6 +239,9 @@
         return;
       }
       const PAGE_SIZE = 50;
+      /* 切换到其他批次（例如从班级管理点进另一个批次）时，自动回到只读浏览状态 */
+      if (state.seenBatchId !== batch.id) { state.editing = false; state.seenBatchId = batch.id; }
+      const editing = state.editing;
       /* 筛选 */
       let list = batch.students.slice();
       if (state.keyword) {
@@ -252,9 +272,17 @@
       ];
 
       let html = UC.viewHead("数据录入", esc(UC.batchLabel(batch)),
-        '<button class="btn btn-primary btn-lg" onclick="FCS.importUI.open()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4v10.5\"/><path d=\"M7.5 10L12 14.5 16.5 10\"/><path d=\"M4.5 19.5h15\"/></svg>导入Excel</button>' +
-        '<button class="btn btn-lg" onclick="FCS.importUI.openAI()"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5zM8.3 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM13.7 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM19.1 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6z"/></svg>AI智能导入</button>' +
-        '<button class="btn" onclick="FCS.entryEdit.addStudent()">＋ 添加学生</button>');
+        (editing
+          ? '<button class="btn btn-lg" onclick="FCS.entryEdit.toggleEdit()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>完成</button>'
+          : '<button class="btn btn-lg" onclick="FCS.entryEdit.toggleEdit()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 000-3l-1-1a2.1 2.1 0 00-3 0L4 16z"/><path d="M13.5 6.5l3 3"/></svg>手动编辑</button>') +
+        '<button class="btn btn-lg" onclick="FCS.importUI.open()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10.5"/><path d="M7.5 10L12 14.5 16.5 10"/><path d="M4.5 19.5h15"/></svg>导入Excel</button>' +
+        '<button class="btn btn-primary btn-lg" onclick="FCS.importUI.openAI()"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5zM8.3 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM13.7 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6zM19.1 10.5a1.3 1.3 0 100-2.6 1.3 1.3 0 100 2.6z"/></svg>AI智能导入</button>' +
+        (editing ? '<button class="btn btn-lg" onclick="FCS.entryEdit.addStudent()">＋ 添加学生</button>' : ""));
+      if (editing) {
+        html += '<div class="entry-mode-bar">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 000-3l-1-1a2.1 2.1 0 00-3 0L4 16z"/><path d="M13.5 6.5l3 3"/></svg>' +
+          "<span>编辑模式：可直接修改下方单元格，修改后自动保存；点右上角「完成」退出编辑</span></div>";
+      }
       html += '<div class="entry-toolbar">' +
         '<input id="entry-search" class="input" placeholder="搜索姓名/学籍号" value="' + esc(state.keyword) + '" onchange="FCS.entryEdit.search()" style="width:180px">' +
         '<select class="input" onchange="FCS.entryEdit.filterGender(this.value)">' +
@@ -270,7 +298,8 @@
       if (!pageList.length) {
         html += '<div class="card"><div class="empty-tip">' + (batch.students.length ? "没有符合条件的学生" : "批次内还没有学生") + "</div>" +
           '<div style="text-align:center;padding-bottom:28px" class="flex gap8" style="justify-content:center">' +
-          '<button class="btn btn-primary" onclick="FCS.importUI.open()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4v10.5\"/><path d=\"M7.5 10L12 14.5 16.5 10\"/><path d=\"M4.5 19.5h15\"/></svg>导入Excel</button>' +
+          '<button class="btn" onclick="FCS.importUI.open()"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4v10.5\"/><path d=\"M7.5 10L12 14.5 16.5 10\"/><path d=\"M4.5 19.5h15\"/></svg>导入Excel</button>' +
+          '<button class="btn btn-primary" onclick="FCS.importUI.openAI()"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" fill-rule=\"evenodd\"><path d=\"M4 3.5h16a1.5 1.5 0 011.5 1.5v10a1.5 1.5 0 01-1.5 1.5H9.4L4.7 20.6v-4.1H4a1.5 1.5 0 01-1.5-1.5V5A1.5 1.5 0 014 3.5z\"/></svg>AI智能导入</button>' +
           '<button class="btn" onclick="FCS.entryEdit.addStudent()">＋ 手动添加</button>' +
           "</div></div>";
         el.innerHTML = html;
@@ -290,32 +319,43 @@
         const c = S.computeAll(s.gender, s.raw);
         const isIncomplete = !c.complete;
         html += "<tr" + (isIncomplete ? ' class="row-error"' : "") + ">";
-        /* 学籍号/姓名/性别 */
-        html += '<td><input id="inp-' + s.id + '-studentNo" value="' + esc(s.studentNo) + '" onchange="FCS.entryEdit.editInfo(\'' + s.id + "','studentNo')\" style=\"width:112px\"></td>";
-        html += '<td><input id="inp-' + s.id + '-name" value="' + esc(s.name) + '" onchange="FCS.entryEdit.editInfo(\'' + s.id + "','name')\" style=\"width:80px\"></td>";
-        html += '<td><select id="inp-' + s.id + '-gender" onchange="FCS.entryEdit.editInfo(\'' + s.id + "','gender')\" style=\"border:1px solid var(--border);border-radius:6px;padding:5px\">" +
-          '<option value="male"' + (s.gender === "male" ? " selected" : "") + ">男</option>" +
-          '<option value="female"' + (s.gender === "female" ? " selected" : "") + ">女</option>" +
-          "</select></td>";
-        /* 公共项目成绩输入 */
-        fields.forEach(function (f) {
-          const key = f[0];
-          html += '<td><input id="inp-' + s.id + "-" + key + '" value="' + esc(rawInputText(s, key)) + '" placeholder="—"' +
-            ' onchange="FCS.entryEdit.editField(\'' + s.id + "','" + key + '\')"' +
-            "></td>";
-        });
-        /* 男女专属项目：本性别可填写，异性列置灰不可填写 */
-        genderFields.forEach(function (g) {
-          if (s.gender === g.gender) {
-            html += '<td><input id="inp-' + s.id + "-" + g.key + '" value="' + esc(rawInputText(s, g.key)) + '" placeholder="—"' +
-              ' onchange="FCS.entryEdit.editField(\'' + s.id + "','" + g.key + '\')"' +
-              (g.key === "endurance" ? ' title="格式：4\'07 或 4:07 或 4.07"' : "") +
+        if (editing) {
+          /* 学籍号/姓名/性别 */
+          html += '<td><input id="inp-' + s.id + '-studentNo" value="' + esc(s.studentNo) + '" onchange="FCS.entryEdit.editInfo(\'' + s.id + "','studentNo')\" style=\"width:112px\"></td>";
+          html += '<td><input id="inp-' + s.id + '-name" value="' + esc(s.name) + '" onchange="FCS.entryEdit.editInfo(\'' + s.id + "','name')\" style=\"width:80px\"></td>";
+          html += '<td><select id="inp-' + s.id + '-gender" onchange="FCS.entryEdit.editInfo(\'' + s.id + "','gender')\" style=\"border:1px solid var(--border);border-radius:6px;padding:5px\">" +
+            '<option value="male"' + (s.gender === "male" ? " selected" : "") + ">男</option>" +
+            '<option value="female"' + (s.gender === "female" ? " selected" : "") + ">女</option>" +
+            "</select></td>";
+          /* 公共项目成绩输入 */
+          fields.forEach(function (f) {
+            const key = f[0];
+            html += '<td><input id="inp-' + s.id + "-" + key + '" value="' + esc(rawInputText(s, key)) + '" placeholder="—"' +
+              ' onchange="FCS.entryEdit.editField(\'' + s.id + "','" + key + '\')"' +
               "></td>";
-          } else {
-            html += '<td><input disabled id="inp-' + s.id + "-" + g.key + '-off" placeholder="—"' +
-              ' title="仅' + (g.gender === "male" ? "男生" : "女生") + '测试，无需填写"></td>';
-          }
-        });
+          });
+          /* 男女专属项目：本性别可填写，异性列置灰不可填写 */
+          genderFields.forEach(function (g) {
+            if (s.gender === g.gender) {
+              html += '<td><input id="inp-' + s.id + "-" + g.key + '" value="' + esc(rawInputText(s, g.key)) + '" placeholder="—"' +
+                ' onchange="FCS.entryEdit.editField(\'' + s.id + "','" + g.key + '\')"' +
+                (g.key === "endurance" ? ' title="格式：4\'07 或 4:07 或 4.07"' : "") +
+                "></td>";
+            } else {
+              html += '<td><input disabled id="inp-' + s.id + "-" + g.key + '-off" placeholder="—"' +
+                ' title="仅' + (g.gender === "male" ? "男生" : "女生") + '测试，无需填写"></td>';
+            }
+          });
+        } else {
+          /* 只读：姓名可点击进入个人报告 */
+          html += '<td class="num">' + esc(s.studentNo) + "</td>";
+          html += '<td><span class="name-link" title="查看该生个人报告" onclick="FCS.app.navigate(\'#/student/' + s.id + '\')">' + esc(s.name) + "</span></td>";
+          html += "<td>" + (s.gender === "male" ? "男" : "女") + "</td>";
+          fields.forEach(function (f) { html += "<td class=\"num\">" + roCell(rawInputText(s, f[0])) + "</td>"; });
+          genderFields.forEach(function (g) {
+            html += "<td class=\"num\">" + (s.gender === g.gender ? roCell(rawInputText(s, g.key)) : '<span class="text-3">—</span>') + "</td>";
+          });
+        }
         /* BMI */
         html += '<td class="num">' + (c.bmi !== null ? c.bmi : '<span class="text-3">—</span>') + "</td>";
         /* 总分 */
@@ -328,14 +368,17 @@
           html += (i ? " / " : "") + UC.scoreSpan(c.itemScores[k]);
         });
         html += "</td>";
-        /* 操作：查看个人报告 / 删除 */
+        /* 操作：查看个人报告 /（编辑状态下）删除 */
         html += '<td class="no-print"><button class="btn btn-sm" onclick="FCS.app.navigate(\'#/student/' + s.id + '\')">报告</button>' +
-          '<button class="btn btn-sm btn-danger" style="margin-left:6px" onclick="FCS.entryEdit.removeStudent(\'' + s.id + '\')">删除</button></td>';
+          (editing ? '<button class="btn btn-sm btn-danger" style="margin-left:6px" onclick="FCS.entryEdit.removeStudent(\'' + s.id + '\')">删除</button>' : "") +
+          "</td>";
         html += "</tr>";
       });
       html += "</tbody></table></div>";
       html += '<div class="flex space-between items-center mt16">' +
-        '<div class="text-sm text-2">提示：1000米/800米跑可填 4\'07 / 4:07 / 4.07；灰色格为异性项目无需填写；填写后自动计算得分并保存；红色行为有缺项</div>' +
+        '<div class="text-sm text-2">' + (editing
+          ? "编辑中：1000米/800米跑可填 4'07 / 4:07 / 4.07；灰色格为异性项目无需填写；填写后自动计算得分并保存；红色行为有缺项"
+          : "点击学生姓名可查看该生个人报告；点右上角「手动编辑」可修改成绩；红色行为有缺项") + "</div>" +
         UC.pager({ page: state.page, pageSize: PAGE_SIZE, total: list.length, onChange: "FCS.entryEdit.setPage" }) +
         "</div></div>";
       el.innerHTML = html;
