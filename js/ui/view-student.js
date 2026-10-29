@@ -141,7 +141,6 @@
           '<div class="wp-name">' + esc(S.itemLabel(w.key, rep.gender)) + "</div>" +
           '<div class="wp-data">' + esc(rawShow(rep, w.key)) + "</div>" +
           '<div class="wp-score" style="color:' + (w.score < 60 ? "var(--danger)" : "#a06f00") + '">' + w.score + " 分</div>" +
-          (w.gap !== undefined && w.gap !== null ? '<div class="wp-data">低于个人总分 ' + w.gap + " 分</div>" : "") +
           "</div>" +
           '<div class="wp-right">' + esc(sugText) + "</div>" +
           "</div>";

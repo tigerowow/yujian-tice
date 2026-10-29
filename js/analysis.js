@@ -189,7 +189,8 @@
         if (score < 60) {
           must.push({ key: key, score: score, loss: (100 - score) * S.itemMeta[key].weight });
         } else if (score < computed.total - th.personalBelowTotal) {
-          relative.push({ key: key, score: score, gap: computed.total - score });
+          /* gap 保留一位小数，避免浮点误差出现 12.599999999999994 这类数字 */
+          relative.push({ key: key, score: score, gap: Math.round((computed.total - score) * 10) / 10 });
         }
       });
       must.sort(function (a, b) { return b.loss - a.loss; });
