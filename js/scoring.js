@@ -25,6 +25,21 @@
     return m.label;
   };
 
+  /* 原始成绩的显示文本（带单位）：个人报告卡片、原始成绩表格、导出报告共用
+     - 耐力跑：显示 4'31 这种时间写法，本身已含分秒，不再追加单位
+     - 身高体重：显示 身高cm / 体重kg，本身已含单位
+     - 其余项目：数值 + 单位（毫升 / 秒 / 厘米 / 个）
+     传 raw 对象（如 student.raw），返回可直接显示的字符串，缺项返回 "—" */
+  S.rawDisplay = function (raw, key) {
+    raw = raw || {};
+    if (key === "endurance") return raw.endurance ? raw.endurance.display : "—";
+    if (key === "bmi") return raw.height && raw.weight ? raw.height + "cm / " + raw.weight + "kg" : "—";
+    const v = raw[key];
+    if (v === null || v === undefined || v === "") return "—";
+    const unit = (S.itemMeta[key] || {}).unit;
+    return String(v) + (unit ? " " + unit : "");
+  };
+
   /* 耐力跑阈值换算：分.秒 → 整数秒 */
   function ms(min, sec) { return min * 60 + sec; }
 

@@ -347,13 +347,7 @@
 
     h += h2("二、各项目得分");
     h += tableStart(["项目", "原始成绩", "得分", "权重"]);
-    const rawShow = function (s, k) {
-      const raw = s.raw || {};
-      if (k === "endurance") return raw.endurance ? raw.endurance.display : "—";
-      if (k === "bmi") return raw.height && raw.weight ? raw.height + "cm / " + raw.weight + "kg" : "—";
-      if (raw[k] === null || raw[k] === undefined) return "—";
-      return String(raw[k]);
-    };
+    const rawShow = function (s, k) { return S.rawDisplay(s.raw, k); };
     S.items.forEach(function (k) {
       h += row([S.itemLabel(k, rep.gender), rawShow(rep, k), rep.itemScores[k] !== null ? rep.itemScores[k] : "—", (S.itemMeta[k].weight * 100) + "%"]);
     });

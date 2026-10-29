@@ -400,7 +400,7 @@
       if (t) { value = t.seconds; display = t.display; }
     } else {
       const m = rest.match(/-?\d+(?:\.\d+)?/);
-      if (m) { value = parseFloat(m[0]); display = value + (def.unit || ""); }
+      if (m) { value = parseFloat(m[0]); display = value + (def.unit ? " " + def.unit : ""); }
     }
     if (value === null) return ruleAnswer(def, gender);
     const label = S.itemLabel(def.key, gender);

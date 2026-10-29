@@ -114,13 +114,7 @@
         '<div class="card"><div id="st-radar" class="chart-box"></div></div>' +
         '<div class="card"><div class="card-title">各项目得分</div><div class="table-wrap"><table class="tbl"><thead><tr>' +
         "<th>项目</th><th>原始成绩</th><th>得分</th><th>权重</th></tr></thead><tbody>";
-      const rawShow = function (s, k) {
-        const raw = s.raw || {};
-        if (k === "endurance") return raw.endurance ? raw.endurance.display : "—";
-        if (k === "bmi") return raw.height && raw.weight ? raw.height + "cm / " + raw.weight + "kg" : "—";
-        if (raw[k] === null || raw[k] === undefined) return "—";
-        return String(raw[k]);
-      };
+      const rawShow = function (s, k) { return S.rawDisplay(s.raw, k); };
       S.items.forEach(function (k) {
         html += "<tr><td class='bold'>" + S.itemLabel(k, rep.gender) + "</td>" +
           "<td>" + esc(rawShow(rep, k)) + "</td>" +
